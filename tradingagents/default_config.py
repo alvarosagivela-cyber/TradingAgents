@@ -77,6 +77,8 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
+    # Research thesis audit trail (append-only JSONL) — Phase 2 Research layer output
+    "research_thesis_log_path": os.getenv("TRADINGAGENTS_RESEARCH_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "research", "theses.jsonl")),
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.5",

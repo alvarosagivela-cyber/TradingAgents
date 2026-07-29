@@ -88,7 +88,6 @@ class TestMomentumThesisPipeline:
         """Test 1 (happy path): valid momentum state -> valid thesis -> persisted JSONL."""
         # Import the node factories here so they're only needed if test runs
         from tradingagents.agents.researchers.momentum_researcher import (
-            create_momentum_compute_node,
             create_momentum_llm_node,
         )
         from tradingagents.agents.utils.thesis_validator import (
@@ -108,15 +107,7 @@ class TestMomentumThesisPipeline:
                 "research_thesis_log_path": str(tmp_path / "theses.jsonl")
             }
 
-            # Run the pipeline (compute node is mocked to skip real fetch)
-            compute_node = create_momentum_compute_node()
-            with patch(
-                "tradingagents.agents.utils.momentum_calculator.load_ohlcv"
-            ) as mock_load:
-                # Compute node not called in this test (state is pre-populated)
-                # but we skip calling it anyway since state has valid=True already
-                pass
-
+            # Run the pipeline (state is pre-populated, we skip compute node)
             llm_node = create_momentum_llm_node(mock_llm)
             llm_update = llm_node(state)
             state.update(llm_update)
@@ -144,12 +135,17 @@ class TestMomentumThesisPipeline:
         )
 
         # Setup: state has computed retorno_12_1=0.1834, but LLM returns 0.20 (differs by >0.0001)
-        state = _make_momentum_state(
-            retorno_12_1=0.1834,
+        state = _make_momentum_state(retorno_12_1=0.1834)
+        captured = {}
+
+        # Create a mock LLM that returns mismatched data_points
+        mismatch_thesis = ResearchThesis(
+            verdict=TraderAction.BUY,
+            reasoning="Momentum signal is strong based on recent price action.",
+            refutation_criterion="Thesis fails if price closes below the 50-day MA.",
             data_points={"retorno_12_1": 0.20, "z_score": 2.3},  # Mismatch!
         )
-        captured = {}
-        mock_llm = _structured_thesis_llm(captured)
+        mock_llm = _structured_thesis_llm(captured, mismatch_thesis)
 
         with patch(
             "tradingagents.agents.utils.thesis_validator.get_config"
