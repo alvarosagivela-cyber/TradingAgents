@@ -74,3 +74,14 @@ class AgentState(MessagesState):
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
     past_context: Annotated[str, "Memory log context injected at run start (same-ticker decisions + cross-ticker lessons)"]
+
+    # momentum researcher / thesis fields (Phase 2)
+    retorno_12_1: Annotated[float, "12-month buy-and-hold return, skip-month convention (D-07, D-10: computed by Python before the LLM runs)"]
+    momentum_z_score: Annotated[float, "Z-score of retorno_12_1 vs its 5-year rolling distribution (D-15: computed by Python)"]
+    momentum_valid: Annotated[bool, "False when there is insufficient OHLCV history to compute momentum (fail-open signal, D-10)"]
+    confidence_level: Annotated[str, "high|medium|low, derived by Python code from z-score magnitude — never LLM-generated (D-15)"]
+    thesis: Annotated[str, "LLM causal-reasoning prose (D-09)"]
+    thesis_verdict: Annotated[str, "Buy|Hold|Sell (D-09)"]
+    refutation_criterion: Annotated[str, "Concrete falsifiable prediction (D-17)"]
+    data_points: Annotated[dict, "LLM-cited numeric values for D-11 validation: retorno_12_1, z_score"]
+    verified: Annotated[bool, "D-11 validation result — exact tolerance match between data_points and computed values"]

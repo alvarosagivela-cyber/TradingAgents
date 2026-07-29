@@ -339,3 +339,59 @@ def render_sentiment_report(report: SentimentReport) -> str:
         "",
         report.narrative,
     ])
+
+
+# ---------------------------------------------------------------------------
+# Momentum Researcher
+# ---------------------------------------------------------------------------
+
+
+class ResearchThesis(BaseModel):
+    """Structured investment thesis produced by the Momentum Researcher.
+
+    The thesis combines an explicit investment verdict (Buy/Hold/Sell) with
+    causal reasoning and the exact numeric data-points cited by the LLM,
+    enabling post-LLM validation of numeric accuracy against ground-truth
+    Python-computed values (D-11). The refutation criterion provides a
+    concrete, falsifiable observation that would disprove the thesis (D-17).
+
+    Note: confidence_level is NOT solicited from the LLM (D-15). It is computed
+    separately by Python code based on the z-score, ensuring it reflects
+    epistemic signal rather than model self-assessment or agreement between clones.
+    """
+
+    verdict: TraderAction = Field(
+        description="The investment recommendation. Exactly one of Buy / Hold / Sell.",
+    )
+    reasoning: str = Field(
+        min_length=20,
+        description=(
+            "Causal explanation of why momentum should persist or reverse for this ticker, "
+            "treating retorno_12_1/z_score as evidence, not as the conclusion itself (D-16). "
+            "150-300 words."
+        ),
+    )
+    refutation_criterion: str = Field(
+        min_length=10,
+        description=(
+            "A concrete, falsifiable, ticker/timeframe-scoped observation that would disprove "
+            "this thesis (D-17). Not vague self-doubt."
+        ),
+    )
+    data_points: dict[str, float] = Field(
+        description=(
+            "Exact numeric values cited, keyed exactly 'retorno_12_1' and 'z_score' (D-09, D-11) — "
+            "copy the pre-computed values verbatim, do not round or re-derive them."
+        ),
+    )
+
+
+def render_research_thesis(thesis: ResearchThesis) -> str:
+    """Render a ResearchThesis to markdown for storage and downstream consumption."""
+    return "\n".join([
+        f"**Verdict**: {thesis.verdict.value}",
+        "",
+        f"**Reasoning**: {thesis.reasoning}",
+        "",
+        f"**Refutation Criterion**: {thesis.refutation_criterion}",
+    ])
