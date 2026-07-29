@@ -12,6 +12,9 @@ from tradingagents.agents import (
     create_conservative_debator,
     create_fundamentals_analyst,
     create_market_analyst,
+    create_momentum_compute_node,
+    create_momentum_llm_node,
+    create_momentum_validate_node,
     create_msg_delete,
     create_neutral_debator,
     create_news_analyst,
@@ -85,6 +88,11 @@ class GraphSetup:
         research_manager_node = create_research_manager(self.deep_thinking_llm)
         trader_node = create_trader(self.quick_thinking_llm)
 
+        # Create momentum research nodes
+        momentum_compute_node = create_momentum_compute_node()
+        momentum_llm_node = create_momentum_llm_node(self.quick_thinking_llm)
+        momentum_validate_node = create_momentum_validate_node()
+
         # Create risk analysis nodes
         aggressive_analyst = create_aggressive_debator(self.quick_thinking_llm)
         neutral_analyst = create_neutral_debator(self.quick_thinking_llm)
@@ -105,6 +113,9 @@ class GraphSetup:
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
         workflow.add_node("Trader", trader_node)
+        workflow.add_node("Momentum Compute", momentum_compute_node)
+        workflow.add_node("Momentum LLM", momentum_llm_node)
+        workflow.add_node("Momentum Validate", momentum_validate_node)
         workflow.add_node("Aggressive Analyst", aggressive_analyst)
         workflow.add_node("Neutral Analyst", neutral_analyst)
         workflow.add_node("Conservative Analyst", conservative_analyst)
@@ -128,11 +139,16 @@ class GraphSetup:
             )
             workflow.add_edge(current_tools, current_analyst)
 
-            # Connect to next analyst or to Bull Researcher if this is the last analyst
+            # Connect to next analyst or to Momentum Compute if this is the last analyst
             if i < len(plan.specs) - 1:
                 workflow.add_edge(current_clear, plan.specs[i + 1].agent_node)
             else:
-                workflow.add_edge(current_clear, "Bull Researcher")
+                workflow.add_edge(current_clear, "Momentum Compute")
+
+        # Momentum research pipeline edges
+        workflow.add_edge("Momentum Compute", "Momentum LLM")
+        workflow.add_edge("Momentum LLM", "Momentum Validate")
+        workflow.add_edge("Momentum Validate", "Bull Researcher")
 
         # Both research-debate edges share the complete DEBATE_PATH_MAP (#1088).
         for debate_node in ("Bull Researcher", "Bear Researcher"):
