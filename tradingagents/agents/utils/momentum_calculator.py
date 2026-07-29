@@ -59,11 +59,12 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
         # Load OHLCV data (5-year lookback, already cleaned and ascending-by-Date)
         data = load_ohlcv(ticker, as_of_date)
 
-        # Ensure enough history: need 252 days for 12-month leg + 21 for skip month
+        # Ensure enough history: need 252 days for 12-month leg + 22 for skip month
+        # (252 + 22 = 274; we need n >= 274 to have indices 0 through 273 available)
         n = len(data)
-        if n < 273:
+        if n < 274:
             logger.warning(
-                f"Insufficient OHLCV history for {ticker}: {n} rows < 273 required (12-1 formula)"
+                f"Insufficient OHLCV history for {ticker}: {n} rows < 274 required (12-1 skip-month formula)"
             )
             return MomentumMetrics(
                 retorno_12_1=0.0,
@@ -75,11 +76,12 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
 
         # Compute retorno_12_1 (Jegadeesh-Titman skip-month formula)
         # Data is sorted ascending by Date, so:
-        # - Most recent: data.iloc[-1]
-        # - 21 days ago: data.iloc[n - 21]
-        # - 252 days ago: data.iloc[n - 252]
-        idx_1m = n - 21
-        idx_12m = n - 252
+        # - Most recent: data.iloc[-1] (index n-1)
+        # - 21 days ago: data.iloc[-22] (index n-1-21 = n-22)
+        # - 252 days ago: data.iloc[-253] (index n-1-252 = n-253)
+        # Return = (close_1m_ago - close_12m_ago) / close_12m_ago
+        idx_1m = n - 22  # 21 trading days ago (0-indexed)
+        idx_12m = n - 253  # 252 trading days ago (0-indexed)
 
         close_1m_ago = data["Close"].iloc[idx_1m]
         close_12m_ago = data["Close"].iloc[idx_12m]
@@ -98,10 +100,11 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
         retorno_12_1 = round(retorno_12_1, 6)  # 6 decimals as per D-07
 
         # Compute z-score from rolling 12-1 distribution (D-15)
-        # Build rolling returns: shift(21) to skip month, shift(252) for 12-month lookback
+        # Build rolling returns: shift(22) to skip month, shift(253) for 12-month lookback
+        # This matches the formula: (price_21d_ago - price_252d_ago) / price_252d_ago
         rolling = (
-            (data["Close"].shift(21) - data["Close"].shift(252))
-            / data["Close"].shift(252)
+            (data["Close"].shift(22) - data["Close"].shift(253))
+            / data["Close"].shift(253)
         )
         rolling = rolling.dropna()
 
