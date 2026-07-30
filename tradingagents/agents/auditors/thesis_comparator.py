@@ -163,7 +163,11 @@ def _persist_audit_cycle(state: dict, result: dict) -> None:
         result: Dict with auditor_verified and comparison_result
     """
     config = get_config()
-    log_path = Path(config.get("auditor_log_path"))
+    auditor_log_path = config.get("auditor_log_path") if config else None
+    if not auditor_log_path:
+        logger.error("auditor_log_path not configured; cannot persist Auditor cycle")
+        return
+    log_path = Path(auditor_log_path)
 
     # Create parent directory if needed
     log_path.parent.mkdir(parents=True, exist_ok=True)
