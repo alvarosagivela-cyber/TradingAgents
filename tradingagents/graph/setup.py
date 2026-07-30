@@ -7,6 +7,9 @@ from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import (
     create_aggressive_debator,
+    create_auditor_compare_node,
+    create_auditor_compute_node,
+    create_auditor_llm_node,
     create_bear_researcher,
     create_bull_researcher,
     create_conservative_debator,
@@ -93,6 +96,11 @@ class GraphSetup:
         momentum_llm_node = create_momentum_llm_node(self.quick_thinking_llm)
         momentum_validate_node = create_momentum_validate_node()
 
+        # Create auditor nodes (Phase 3 — independent from Research)
+        auditor_compute_node = create_auditor_compute_node()
+        auditor_llm_node = create_auditor_llm_node(model="claude-sonnet-5")
+        auditor_compare_node = create_auditor_compare_node()
+
         # Create risk analysis nodes
         aggressive_analyst = create_aggressive_debator(self.quick_thinking_llm)
         neutral_analyst = create_neutral_debator(self.quick_thinking_llm)
@@ -116,6 +124,9 @@ class GraphSetup:
         workflow.add_node("Momentum Compute", momentum_compute_node)
         workflow.add_node("Momentum LLM", momentum_llm_node)
         workflow.add_node("Momentum Validate", momentum_validate_node)
+        workflow.add_node("Auditor Compute", auditor_compute_node)
+        workflow.add_node("Auditor LLM", auditor_llm_node)
+        workflow.add_node("Auditor Compare", auditor_compare_node)
         workflow.add_node("Aggressive Analyst", aggressive_analyst)
         workflow.add_node("Neutral Analyst", neutral_analyst)
         workflow.add_node("Conservative Analyst", conservative_analyst)
@@ -157,7 +168,11 @@ class GraphSetup:
                 self.conditional_logic.should_continue_debate,
                 DEBATE_PATH_MAP,
             )
-        workflow.add_edge("Research Manager", "Trader")
+        # Wire Auditor between Research Manager and Trader (Phase 3 — replaces direct edge)
+        workflow.add_edge("Research Manager", "Auditor Compute")
+        workflow.add_edge("Auditor Compute", "Auditor LLM")
+        workflow.add_edge("Auditor LLM", "Auditor Compare")
+        workflow.add_edge("Auditor Compare", "Trader")
         workflow.add_edge("Trader", "Aggressive Analyst")
         # All three risk edges share the complete RISK_ANALYSIS_PATH_MAP (#1088).
         for risk_node in ("Aggressive Analyst", "Conservative Analyst", "Neutral Analyst"):

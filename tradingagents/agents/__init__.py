@@ -5,6 +5,11 @@ from .analysts.sentiment_analyst import (
     create_sentiment_analyst,
     create_social_media_analyst,  # deprecated alias kept for back-compat
 )
+from .auditors.momentum_auditor import (
+    create_auditor_compute_node,
+    create_auditor_llm_node,
+)
+from .auditors.thesis_comparator import create_auditor_compare_node
 from .managers.portfolio_manager import create_portfolio_manager
 from .managers.research_manager import create_research_manager
 from .researchers.bear_researcher import create_bear_researcher
@@ -24,6 +29,9 @@ from .utils.thesis_validator import create_momentum_validate_node
 __all__ = [
     "AgentState",
     "create_aggressive_debator",
+    "create_auditor_compare_node",
+    "create_auditor_compute_node",
+    "create_auditor_llm_node",
     "create_bear_researcher",
     "create_bull_researcher",
     "create_conservative_debator",
