@@ -395,3 +395,63 @@ def render_research_thesis(thesis: ResearchThesis) -> str:
         "",
         f"**Refutation Criterion**: {thesis.refutation_criterion}",
     ])
+
+
+# ---------------------------------------------------------------------------
+# Auditor (Phase 3)
+# ---------------------------------------------------------------------------
+
+
+class AuditorVerdict(BaseModel):
+    """Structured refutation verdict produced by the independent Auditor.
+
+    The Auditor runs on a separate LLM instance with an asymmetric refutation mandate:
+    finding concrete reasons the Research thesis could be WRONG, not neutral analysis.
+    Like ResearchThesis, this schema deliberately omits a `verified` field (D-11 discipline —
+    verification is computed by deterministic Python code downstream, never trusted
+    from the LLM).
+
+    Note: The Auditor's job is ruthless critique of the Research verdict, so the
+    refutation_criterion specifically targets disproving the RESEARCH thesis, not
+    the Auditor's own verdict.
+    """
+
+    verdict: TraderAction = Field(
+        description="The Auditor's independent verdict: Buy / Hold / Sell. "
+                    "Produced under an asymmetric refutation mandate (D-04): "
+                    "the LLM is tasked explicitly with finding reasons the Research thesis could be wrong.",
+    )
+    reasoning: str = Field(
+        min_length=20,
+        description=(
+            "Auditor's causal explanation of why the Research thesis could be WRONG, "
+            "not a neutral re-analysis of the ticker (D-04). "
+            "250-400 words of ruthless critique grounded in the auditor_retorno_12_1 / auditor_z_score."
+        ),
+    )
+    refutation_criterion: str = Field(
+        min_length=10,
+        description=(
+            "A concrete, falsifiable observation that would disprove the RESEARCH thesis, "
+            "not the Auditor's own verdict. "
+            "This is the crux of the independent check: what would prove Research wrong?"
+        ),
+    )
+    data_points: dict[str, float] = Field(
+        description=(
+            "Exact numeric values the Auditor cites, keyed exactly 'retorno_12_1' and 'z_score' (D-09, D-11). "
+            "These are the Auditor's OWN pre-computed values (from the compute node), "
+            "copied verbatim into the schema. Do NOT recalculate or round."
+        ),
+    )
+
+
+def render_auditor_verdict(verdict: AuditorVerdict) -> str:
+    """Render an AuditorVerdict to markdown for storage and downstream consumption."""
+    return "\n".join([
+        f"**Verdict**: {verdict.verdict.value}",
+        "",
+        f"**Reasoning (Refutation)**: {verdict.reasoning}",
+        "",
+        f"**Refutation Criterion (Disproving Research)**: {verdict.refutation_criterion}",
+    ])

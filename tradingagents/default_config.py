@@ -79,6 +79,8 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "memory_log_max_entries": None,
     # Research thesis audit trail (append-only JSONL) — Phase 2 Research layer output
     "research_thesis_log_path": os.getenv("TRADINGAGENTS_RESEARCH_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "research", "theses.jsonl")),
+    # Auditor cycle audit trail (append-only JSONL) — Phase 3 Auditor layer output (EVERY cycle persisted, including refuted, D-06)
+    "auditor_log_path": os.getenv("TRADINGAGENTS_AUDITOR_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "auditor", "audits.jsonl")),
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.5",

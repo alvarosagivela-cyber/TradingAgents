@@ -85,3 +85,16 @@ class AgentState(MessagesState):
     refutation_criterion: Annotated[str, "Concrete falsifiable prediction (D-17)"]
     data_points: Annotated[dict, "LLM-cited numeric values for D-11 validation: retorno_12_1, z_score"]
     verified: Annotated[bool, "D-11 validation result — exact tolerance match between data_points and computed values"]
+
+    # auditor fields (Phase 3 — AUDIT-01/02/03/04)
+    auditor_phase1_status: Annotated[str, "pass|fail — pass when auditor_retorno_12_1/auditor_z_score computed successfully, fail when data fetch fails (D-02)"]
+    auditor_phase1_failure_reason: Annotated[str, "Empty string when status=pass; otherwise a code like 'insufficient_ohlcv_history' explaining the failure (D-02)"]
+    auditor_retorno_12_1: Annotated[float, "Auditor's own computed 12-month momentum (independent of Research retorno_12_1, AUDIT-01)"]
+    auditor_z_score: Annotated[float, "Auditor's own computed Z-score (independent of Research momentum_z_score, AUDIT-01)"]
+    auditor_confidence_level: Annotated[str, "high|medium|low, derived by Python code from auditor_z_score (AUDIT-02)"]
+    auditor_verdict: Annotated[str, "Buy|Hold|Sell|INCONCLUSIVE (AUDIT-02; INCONCLUSIVE when phase1_status=fail, D-02)"]
+    auditor_reasoning: Annotated[str, "Auditor's causal reasoning under the asymmetric refutation mandate (D-04): why Research thesis could be WRONG"]
+    auditor_refutation_criterion: Annotated[str, "Concrete falsifiable observation disproving the RESEARCH thesis, not the Auditor's own verdict (D-04)"]
+    auditor_data_points: Annotated[dict, "Auditor's own cited numeric values: retorno_12_1 and z_score (keyed identically to data_points, AUDIT-01, D-09)"]
+    auditor_verified: Annotated[bool, "D-11 validation result — computed deterministically by Python, never self-reported by the LLM (AUDIT-03)"]
+    comparison_result: Annotated[str, "match|mismatch|not_reached — thesis_verdict vs auditor_verdict comparison, persisted UNCONDITIONALLY including refuted cycles (D-06)"]
