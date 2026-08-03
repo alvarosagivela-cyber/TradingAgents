@@ -25,9 +25,9 @@ REPORT_AGENTS = [
     "researchers/bear_researcher.py",
     "managers/research_manager.py",
     "managers/portfolio_manager.py",
-    "risk_mgmt/aggressive_debator.py",
-    "risk_mgmt/conservative_debator.py",
-    "risk_mgmt/neutral_debator.py",
+    "risk_mgmt/aggressive_perspective.py",
+    "risk_mgmt/conservative_perspective.py",
+    "risk_mgmt/balanced_perspective.py",
     "trader/trader.py",
 ]
 

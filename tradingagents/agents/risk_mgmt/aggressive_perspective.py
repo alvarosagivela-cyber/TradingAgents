@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 
 from tradingagents.agents.schemas import RiskDecision
+from tradingagents.agents.utils.agent_utils import get_language_instruction
 from tradingagents.agents.utils.structured import bind_structured
 from tradingagents.dataflows.config import get_config
 from tradingagents.llm_clients.factory import create_llm_client
@@ -95,7 +96,7 @@ This is a hard boundary, not a soft guideline.
 - reasoning: 100-300 word explanation grounded in the exact pre-computed values above, emphasizing opportunity
 - risk_factors: Specific concerns if concentration is near/at threshold
 - cited_concentration_pct: Repeat the Total Concentration value verbatim from above
-"""
+""" + get_language_instruction()
 
         # Create a fresh LLM instance (D-02: NOT shared, NOT reused, D-03: temperature=0.4)
         logger.info(f"Aggressive: Creating fresh Haiku instance for {ticker} (D-02, D-03)")
