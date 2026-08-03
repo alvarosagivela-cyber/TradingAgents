@@ -59,6 +59,21 @@ TradingAgents is a multi-agent trading framework that mirrors the dynamics of re
 
 > TradingAgents framework is designed for research purposes. Trading performance may vary based on many factors, including the chosen backbone language models, model temperature, trading periods, the quality of data, and other non-deterministic factors. [It is not intended as financial, investment, or trading advice.](https://tauric.ai/disclaimer/)
 
+## About This Fork — CTA Boutique con Agentes IA
+
+This fork extends the upstream TradingAgents framework with a **separation-of-powers architecture** modeled on how a human investment committee actually works, built entirely on Claude (Haiku/Sonnet) via LangGraph:
+
+- **Research** — proposes a momentum thesis (buy/sell/hold) with a deterministic, Python-computed data foundation and an explicit, traceable reasoning chain.
+- **Independent Auditor** — recomputes its own market data from scratch and refutes or confirms Research's thesis, running on a *different* model and a technically isolated LLM instance, with **zero shared prompt, session, or data source** with Research (mitigating a "TradeTrap" collapse mode where nominally independent agents silently converge).
+- **Risk Squad** — three risk perspectives (conservative/balanced/aggressive), each isolated the same way, can veto a trade before it ever reaches execution — enforced structurally by LangGraph topology, not a runtime `if` check, and verified by dedicated graph-reachability tests.
+- **Portfolio Manager** — executes exclusively against Alpaca's **paper trading** API. No code path in this fork can reach a real trading account.
+
+**Core value being tested:** whether genuine architectural isolation between Research and Auditor lets the Auditor catch bad theses that Research alone would have missed — not just whether the system "looks correct." Every phase's isolation and security guarantees are backed by automated tests (topology reachability, source-inspection isolation checks, numeric tolerance validation), not just design intent.
+
+**Status:** active architecture-validation phase, paper trading only, zero real capital. Phases 1–4 (Foundation, Research, Auditor, Risk Management & Paper Execution) are implemented and tested; Phases 5–7 (Memory/Feedback, Observability, and a 4–6 week continuous paper-trading validation run) are planned but not yet built.
+
+---
+
 Our framework decomposes complex trading tasks into specialized roles.
 
 ### Analyst Team
