@@ -74,15 +74,14 @@ def create_risk_aggregator():
         concentration_verified = _validate_risk_concentration(state)
         logger.info(f"Risk Aggregator {ticker}: concentration_verified={concentration_verified}")
 
-        # Build audit trail entry
-        execution_log = state.get("execution_log", [])
+        # Build audit trail entry (new list, never mutate the state's existing one)
         audit_entry = (
             f"Risk cycle: {conservative.get('verdict', 'N/A')} | "
             f"{balanced.get('verdict', 'N/A')} | "
             f"{aggressive.get('verdict', 'N/A')} → "
             f"final_veto={final_veto}, verified={concentration_verified}"
         )
-        execution_log.append(audit_entry)
+        execution_log = state.get("execution_log", []) + [audit_entry]
 
         # Persist the cycle UNCONDITIONALLY (D-06: including vetoed, including not_reached)
         _persist_risk_cycle(state, final_veto, concentration_verified)
