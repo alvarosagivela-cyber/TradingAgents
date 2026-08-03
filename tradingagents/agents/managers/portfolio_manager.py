@@ -28,10 +28,27 @@ def create_portfolio_manager(llm):
     def portfolio_manager_node(state) -> dict:
         instrument_context = get_instrument_context_from_state(state)
 
-        history = state["risk_debate_state"]["history"]
-        risk_debate_state = state["risk_debate_state"]
         research_plan = state["investment_plan"]
         trader_plan = state["trader_investment_plan"]
+
+        # Read Risk Squad verdicts via .get() for safe defaults
+        # (These fields are populated by the Risk Squad nodes; if not present,
+        # use empty dicts as defaults so the node doesn't crash on old test fixtures)
+        conservative = state.get("conservative_verdict", {})
+        balanced = state.get("balanced_verdict", {})
+        aggressive = state.get("aggressive_verdict", {})
+        final_veto = state.get("final_veto", False)
+
+        # Build risk summary showing each perspective's verdict + reasoning
+        risk_summary = (
+            f"Conservative: {conservative.get('verdict', 'N/A')} — "
+            f"{conservative.get('reasoning', '')}\n"
+            f"Balanced: {balanced.get('verdict', 'N/A')} — "
+            f"{balanced.get('reasoning', '')}\n"
+            f"Aggressive: {aggressive.get('verdict', 'N/A')} — "
+            f"{aggressive.get('reasoning', '')}\n"
+            f"Risk Squad Decision: {'VETOED' if final_veto else 'APPROVED'}"
+        )
 
         past_context = state.get("past_context", "")
         lessons_line = (
@@ -57,8 +74,8 @@ def create_portfolio_manager(llm):
 - Research Manager's investment plan: **{research_plan}**
 - Trader's transaction proposal: **{trader_plan}**
 {lessons_line}
-**Risk Analysts Debate History:**
-{history}
+**Risk Squad Verdicts:**
+{risk_summary}
 
 ---
 
@@ -74,21 +91,7 @@ Be decisive and ground every conclusion in specific evidence from the analysts.
             "Portfolio Manager",
         )
 
-        new_risk_debate_state = {
-            "judge_decision": final_trade_decision,
-            "history": risk_debate_state["history"],
-            "aggressive_history": risk_debate_state["aggressive_history"],
-            "conservative_history": risk_debate_state["conservative_history"],
-            "neutral_history": risk_debate_state["neutral_history"],
-            "latest_speaker": "Judge",
-            "current_aggressive_response": risk_debate_state["current_aggressive_response"],
-            "current_conservative_response": risk_debate_state["current_conservative_response"],
-            "current_neutral_response": risk_debate_state["current_neutral_response"],
-            "count": risk_debate_state["count"],
-        }
-
         return {
-            "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": final_trade_decision,
         }
 
