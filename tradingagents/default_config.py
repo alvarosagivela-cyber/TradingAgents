@@ -25,6 +25,9 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":   "google_thinking_level",
     "TRADINGAGENTS_OPENAI_REASONING_EFFORT": "openai_reasoning_effort",
     "TRADINGAGENTS_ANTHROPIC_EFFORT":        "anthropic_effort",
+    # Risk Squad configuration (Phase 4)
+    "TRADINGAGENTS_RISK_POSITION_SIZE_PCT":      "risk_position_size_pct",
+    "TRADINGAGENTS_RISK_MAX_CONCENTRATION_PCT":  "risk_max_concentration_pct",
 }
 
 
@@ -81,6 +84,12 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "research_thesis_log_path": os.getenv("TRADINGAGENTS_RESEARCH_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "research", "theses.jsonl")),
     # Auditor cycle audit trail (append-only JSONL) — Phase 3 Auditor layer output (EVERY cycle persisted, including refuted, D-06)
     "auditor_log_path": os.getenv("TRADINGAGENTS_AUDITOR_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "auditor", "audits.jsonl")),
+    # Risk Squad cycle audit trail (append-only JSONL) — Phase 4 Risk layer output (EVERY cycle persisted, including vetoed, D-06/RISK-01)
+    "risk_log_path": os.getenv("TRADINGAGENTS_RISK_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "risk", "decisions.jsonl")),
+    # Risk Squad position sizing: deterministic dollar sizing input the Risk Squad votes on (2% of portfolio equity per proposed trade; D-03)
+    "risk_position_size_pct": 0.02,
+    # Risk Squad concentration threshold: single-ticker concentration limit cited as reference in each perspective's prompt
+    "risk_max_concentration_pct": 0.05,
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.5",

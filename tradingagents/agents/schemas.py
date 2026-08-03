@@ -455,3 +455,89 @@ def render_auditor_verdict(verdict: AuditorVerdict) -> str:
         "",
         f"**Refutation Criterion (Disproving Research)**: {verdict.refutation_criterion}",
     ])
+
+
+# ---------------------------------------------------------------------------
+# Risk Squad (Phase 4)
+# ---------------------------------------------------------------------------
+
+
+class RiskDecision(BaseModel):
+    """Structured veto/approve verdict produced by a Risk Squad perspective.
+
+    The Risk Squad (conservative/balanced/aggressive) evaluates each trade
+    already approved by Research+Auditor from three distinct risk appetites,
+    with the explicit goal of catching bad trades before execution.
+
+    Like AuditorVerdict and ResearchThesis, this schema deliberately omits
+    a `concentration_verified` or `verified` field (D-11 discipline —
+    verification is computed by deterministic Python code in risk_aggregator.py,
+    never trusted from the LLM). The `cited_concentration_pct` field is what the
+    LLM reports from the prompt context; concentration_verified is computed
+    afterward and stored separately in AgentState.
+    """
+
+    verdict: Literal["VETO", "APPROVE"] = Field(
+        description=(
+            "Binary risk decision. VETO blocks execution (this trade is too risky); "
+            "APPROVE allows it to proceed. No other values are valid."
+        ),
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confidence in this verdict (0.0 = low, 1.0 = high). "
+            "Audit-trail-only field; never gates logic, only recorded for transparency."
+        ),
+    )
+    reasoning: str = Field(
+        min_length=20,
+        max_length=500,
+        description=(
+            "Causal explanation of the risk decision, grounded in pre-computed "
+            "portfolio_total_value, existing_position_value, risk_concentration_pct inputs. "
+            "Must cite exact numeric values, not free-text estimates (D-02). "
+            "100-500 words."
+        ),
+    )
+    risk_factors: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Specific risk concerns cited in the reasoning: "
+            "e.g. ['concentration_breach', 'sector_overlap', 'volatility_spike']. "
+            "Audit trail only; never gates logic."
+        ),
+    )
+    cited_concentration_pct: float = Field(
+        description=(
+            "The risk_concentration_pct value from the prompt's pre-computed inputs, "
+            "copied verbatim by the LLM — do NOT recalculate or estimate (D-11). "
+            "This is compared deterministically by risk_aggregator.py against "
+            "the actual computed concentration; mismatches flag concentration_verified=False."
+        ),
+    )
+
+
+def render_risk_decision(decision: RiskDecision) -> str:
+    """Render a RiskDecision to markdown for storage and audit trail.
+
+    Mirrors the structure of render_auditor_verdict and render_research_thesis.
+    """
+    parts = [
+        f"**Verdict**: {decision.verdict}",
+        "",
+        f"**Confidence**: {decision.confidence:.2f}",
+        "",
+        f"**Reasoning**: {decision.reasoning}",
+    ]
+    if decision.risk_factors:
+        parts.extend([
+            "",
+            f"**Risk Factors**: {', '.join(decision.risk_factors)}",
+        ])
+    parts.extend([
+        "",
+        f"**Cited Concentration %**: {decision.cited_concentration_pct:.4f}",
+    ])
+    return "\n".join(parts)
