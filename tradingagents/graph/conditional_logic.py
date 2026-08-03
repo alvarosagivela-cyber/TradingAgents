@@ -60,14 +60,14 @@ class ConditionalLogic:
             return "Bear Researcher"
         return "Bull Researcher"
 
-    def should_continue_risk_analysis(self, state: AgentState) -> str:
-        """Determine if risk analysis should continue."""
-        if (
-            state["risk_debate_state"]["count"] >= 3 * self.max_risk_discuss_rounds
-        ):  # 3 rounds of back-and-forth between 3 agents
-            return "Portfolio Manager"
-        if state["risk_debate_state"]["latest_speaker"].startswith("Aggressive"):
-            return "Conservative Analyst"
-        if state["risk_debate_state"]["latest_speaker"].startswith("Conservative"):
-            return "Neutral Analyst"
-        return "Aggressive Analyst"
+    def should_execute_paper_trade(self, state: AgentState) -> str:
+        """Route to Paper Execution or END based on Risk Squad veto decision (D-04).
+
+        The veto is a topological guarantee: if final_veto=True, this router
+        unconditionally returns "__end__" (no unconditional edge to Paper Execution
+        exists in the graph). If final_veto=False, router returns "Paper Execution"
+        to submit the paper order.
+        """
+        if state.get("final_veto", False):
+            return "__end__"
+        return "Paper Execution"

@@ -6,27 +6,30 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import (
-    create_aggressive_debator,
+    create_aggressive_perspective,
     create_auditor_compare_node,
     create_auditor_compute_node,
     create_auditor_llm_node,
+    create_balanced_perspective,
     create_bear_researcher,
     create_bull_researcher,
-    create_conservative_debator,
+    create_conservative_perspective,
     create_fundamentals_analyst,
     create_market_analyst,
     create_momentum_compute_node,
     create_momentum_llm_node,
     create_momentum_validate_node,
     create_msg_delete,
-    create_neutral_debator,
     create_news_analyst,
+    create_paper_execution_node,
     create_portfolio_manager,
     create_research_manager,
+    create_risk_aggregator,
     create_sentiment_analyst,
     create_trader,
 )
 from tradingagents.agents.utils.agent_states import AgentState
+from tradingagents.trading.portfolio_snapshot import create_portfolio_snapshot_node
 
 from .analyst_execution import build_analyst_execution_plan
 from .conditional_logic import ConditionalLogic
@@ -40,11 +43,9 @@ DEBATE_PATH_MAP = {
     "Bear Researcher": "Bear Researcher",
     "Research Manager": "Research Manager",
 }
-RISK_ANALYSIS_PATH_MAP = {
-    "Aggressive Analyst": "Aggressive Analyst",
-    "Conservative Analyst": "Conservative Analyst",
-    "Neutral Analyst": "Neutral Analyst",
-    "Portfolio Manager": "Portfolio Manager",
+PORTFOLIO_MANAGER_PATH_MAP = {
+    "Paper Execution": "Paper Execution",
+    "__end__": END,
 }
 
 
@@ -101,10 +102,13 @@ class GraphSetup:
         auditor_llm_node = create_auditor_llm_node(model="claude-sonnet-5")
         auditor_compare_node = create_auditor_compare_node()
 
-        # Create risk analysis nodes
-        aggressive_analyst = create_aggressive_debator(self.quick_thinking_llm)
-        neutral_analyst = create_neutral_debator(self.quick_thinking_llm)
-        conservative_analyst = create_conservative_debator(self.quick_thinking_llm)
+        # Create risk analysis nodes (Phase 4 — Risk Squad with topological veto guarantee)
+        portfolio_snapshot_node = create_portfolio_snapshot_node()
+        conservative_perspective = create_conservative_perspective()
+        balanced_perspective = create_balanced_perspective()
+        aggressive_perspective = create_aggressive_perspective()
+        risk_aggregator_node = create_risk_aggregator()
+        paper_execution_node = create_paper_execution_node()
         portfolio_manager_node = create_portfolio_manager(self.deep_thinking_llm)
 
         # Create workflow
@@ -127,9 +131,12 @@ class GraphSetup:
         workflow.add_node("Auditor Compute", auditor_compute_node)
         workflow.add_node("Auditor LLM", auditor_llm_node)
         workflow.add_node("Auditor Compare", auditor_compare_node)
-        workflow.add_node("Aggressive Analyst", aggressive_analyst)
-        workflow.add_node("Neutral Analyst", neutral_analyst)
-        workflow.add_node("Conservative Analyst", conservative_analyst)
+        workflow.add_node("Portfolio Snapshot", portfolio_snapshot_node)
+        workflow.add_node("Conservative Perspective", conservative_perspective)
+        workflow.add_node("Balanced Perspective", balanced_perspective)
+        workflow.add_node("Aggressive Perspective", aggressive_perspective)
+        workflow.add_node("Risk Aggregator", risk_aggregator_node)
+        workflow.add_node("Paper Execution", paper_execution_node)
         workflow.add_node("Portfolio Manager", portfolio_manager_node)
 
         # Define edges
@@ -173,15 +180,27 @@ class GraphSetup:
         workflow.add_edge("Auditor Compute", "Auditor LLM")
         workflow.add_edge("Auditor LLM", "Auditor Compare")
         workflow.add_edge("Auditor Compare", "Trader")
-        workflow.add_edge("Trader", "Aggressive Analyst")
-        # All three risk edges share the complete RISK_ANALYSIS_PATH_MAP (#1088).
-        for risk_node in ("Aggressive Analyst", "Conservative Analyst", "Neutral Analyst"):
-            workflow.add_conditional_edges(
-                risk_node,
-                self.conditional_logic.should_continue_risk_analysis,
-                RISK_ANALYSIS_PATH_MAP,
-            )
 
-        workflow.add_edge("Portfolio Manager", END)
+        # Wire Risk Squad between Trader and Portfolio Manager (Phase 4)
+        # Portfolio Snapshot computes real account data
+        workflow.add_edge("Trader", "Portfolio Snapshot")
+        # Fan out to three isolated perspectives
+        workflow.add_edge("Portfolio Snapshot", "Conservative Perspective")
+        workflow.add_edge("Portfolio Snapshot", "Balanced Perspective")
+        workflow.add_edge("Portfolio Snapshot", "Aggressive Perspective")
+        # All three perspectives feed into Risk Aggregator
+        workflow.add_edge("Conservative Perspective", "Risk Aggregator")
+        workflow.add_edge("Balanced Perspective", "Risk Aggregator")
+        workflow.add_edge("Aggressive Perspective", "Risk Aggregator")
+        # Risk Aggregator unconditionally feeds into Portfolio Manager
+        workflow.add_edge("Risk Aggregator", "Portfolio Manager")
+
+        # Portfolio Manager's conditional edge to Paper Execution or END (D-04 veto topology)
+        workflow.add_conditional_edges(
+            "Portfolio Manager",
+            self.conditional_logic.should_execute_paper_trade,
+            PORTFOLIO_MANAGER_PATH_MAP,
+        )
+        workflow.add_edge("Paper Execution", END)
 
         return workflow

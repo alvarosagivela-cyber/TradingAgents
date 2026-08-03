@@ -2,10 +2,7 @@
 
 from typing import Any
 
-from tradingagents.agents.utils.agent_states import (
-    InvestDebateState,
-    RiskDebateState,
-)
+from tradingagents.agents.utils.agent_states import InvestDebateState
 
 
 class Propagator:
@@ -44,20 +41,6 @@ class Propagator:
                     "bear_history": "",
                     "history": "",
                     "current_response": "",
-                    "judge_decision": "",
-                    "count": 0,
-                }
-            ),
-            "risk_debate_state": RiskDebateState(
-                {
-                    "aggressive_history": "",
-                    "conservative_history": "",
-                    "neutral_history": "",
-                    "history": "",
-                    "latest_speaker": "",
-                    "current_aggressive_response": "",
-                    "current_conservative_response": "",
-                    "current_neutral_response": "",
                     "judge_decision": "",
                     "count": 0,
                 }
