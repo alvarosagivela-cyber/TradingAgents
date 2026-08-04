@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from tradingagents.agents.reflectors.reflection_reader import read_reflection_for_ticker
 from tradingagents.agents.schemas import RiskDecision
 from tradingagents.agents.utils.agent_utils import get_language_instruction
 from tradingagents.agents.utils.structured import bind_structured
@@ -63,6 +64,24 @@ def create_conservative_perspective(model: str = RISK_MODEL):
             f"(concentration={risk_concentration_pct:.4f}, threshold={risk_max_concentration_pct:.4f})"
         )
 
+        # Read prior reflection from the risk layer (before prompt construction)
+        reflection = read_reflection_for_ticker("risk", ticker)
+
+        # Build reflection context if available
+        reflection_context = ""
+        if reflection is not None:
+            reflection_context = f"""
+## Prior Risk Assessment: {ticker}
+- **Decision Date**: {reflection.decision_date}
+- **Decision**: {reflection.decision_verdict}
+- **Realized Return**: {reflection.realized_return:+.2%}
+- **Classification**: {reflection.classification.upper()}
+- **Lesson**: {reflection.lesson_text}
+
+Factor this prior experience into your downside assessment.
+
+"""
+
         # Build conservative prompt with explicit focus on downside/concentration risk
         prompt = f"""You are a conservative risk manager tasked with a binary VETO or APPROVE decision
 on a proposed trade. Your explicit role is to prioritize capital preservation and downside risk.
@@ -76,6 +95,8 @@ on a proposed trade. Your explicit role is to prioritize capital preservation an
 - Proposed Position Size: ${proposed_notional_usd:,.2f}
 - Total Concentration After Trade: {risk_concentration_pct:.4f} ({risk_concentration_pct*100:.2f}%)
 - Concentration Threshold: {risk_max_concentration_pct:.4f} ({risk_max_concentration_pct*100:.2f}%)
+
+{reflection_context}
 
 **Your Task**:
 1. Evaluate the concentration risk: does this position breach or approach the threshold?

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 
+from tradingagents.agents.reflectors.reflection_reader import read_reflection_for_ticker
 from tradingagents.agents.schemas import RiskDecision
 from tradingagents.agents.utils.agent_utils import get_language_instruction
 from tradingagents.agents.utils.structured import bind_structured
@@ -66,6 +67,24 @@ def create_aggressive_perspective(model: str = RISK_MODEL):
             f"(concentration={risk_concentration_pct:.4f}, threshold={risk_max_concentration_pct:.4f})"
         )
 
+        # Read prior reflection from the risk layer (before prompt construction)
+        reflection = read_reflection_for_ticker("risk", ticker)
+
+        # Build reflection context if available
+        reflection_context = ""
+        if reflection is not None:
+            reflection_context = f"""
+## Prior Risk Assessment: {ticker}
+- **Decision Date**: {reflection.decision_date}
+- **Decision**: {reflection.decision_verdict}
+- **Realized Return**: {reflection.realized_return:+.2%}
+- **Classification**: {reflection.classification.upper()}
+- **Lesson**: {reflection.lesson_text}
+
+Consider whether this prior outcome changes your read on the opportunity.
+
+"""
+
         # Build aggressive prompt with focus on opportunity but hard boundaries
         prompt = f"""You are an aggressive portfolio manager tasked with a binary VETO or APPROVE decision
 on a proposed trade. Your role is to maximize upside opportunity while respecting absolute risk boundaries.
@@ -79,6 +98,8 @@ on a proposed trade. Your role is to maximize upside opportunity while respectin
 - Proposed Position Size: ${proposed_notional_usd:,.2f}
 - Total Concentration After Trade: {risk_concentration_pct:.4f} ({risk_concentration_pct*100:.2f}%)
 - Concentration Threshold: {risk_max_concentration_pct:.4f} ({risk_max_concentration_pct*100:.2f}%)
+
+{reflection_context}
 
 **Your Task**:
 1. Emphasize upside: what is the growth potential of this trade?
