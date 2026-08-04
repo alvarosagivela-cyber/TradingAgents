@@ -126,7 +126,7 @@ This is a hard boundary, not a soft guideline.
                 "anthropic",
                 model,
                 temperature=0.4,
-                max_tokens=500,
+                max_tokens=1000,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Aggressive: Failed to create LLM client: {exc}")

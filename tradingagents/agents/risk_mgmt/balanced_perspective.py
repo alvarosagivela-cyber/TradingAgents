@@ -119,7 +119,7 @@ on a proposed trade. Your role is to weigh both upside opportunity and downside 
                 "anthropic",
                 model,
                 temperature=0.3,
-                max_tokens=500,
+                max_tokens=1000,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Balanced: Failed to create LLM client: {exc}")

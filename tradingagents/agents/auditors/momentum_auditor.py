@@ -193,7 +193,7 @@ Output a structured verdict with:
             auditor_llm = create_llm_client(
                 "anthropic",
                 model,
-                max_tokens=1000,
+                max_tokens=2000,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Auditor: Failed to create LLM client: {exc}")

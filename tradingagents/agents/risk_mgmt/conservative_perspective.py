@@ -119,7 +119,7 @@ on a proposed trade. Your explicit role is to prioritize capital preservation an
                 "anthropic",
                 model,
                 temperature=0.2,
-                max_tokens=500,
+                max_tokens=1000,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Conservative: Failed to create LLM client: {exc}")

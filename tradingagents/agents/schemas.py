@@ -493,12 +493,12 @@ class RiskDecision(BaseModel):
     )
     reasoning: str = Field(
         min_length=20,
-        max_length=500,
+        max_length=2000,
         description=(
             "Causal explanation of the risk decision, grounded in pre-computed "
             "portfolio_total_value, existing_position_value, risk_concentration_pct inputs. "
             "Must cite exact numeric values, not free-text estimates (D-02). "
-            "100-500 words."
+            "100-300 words."
         ),
     )
     risk_factors: list[str] = Field(
