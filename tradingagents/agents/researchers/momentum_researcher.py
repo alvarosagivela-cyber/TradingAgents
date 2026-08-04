@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from tradingagents.agents.reflectors.reflection_reader import read_reflection_for_ticker
 from tradingagents.agents.schemas import ResearchThesis
 from tradingagents.agents.utils.momentum_calculator import compute_momentum
 from tradingagents.agents.utils.structured import bind_structured
@@ -108,6 +109,24 @@ def create_momentum_llm_node(llm):
         z_score = state.get("momentum_z_score", 0.0)
         market_report = state.get("market_report", "")
 
+        # Read prior reflection from the research layer (before prompt construction)
+        reflection = read_reflection_for_ticker("research", ticker)
+
+        # Build reflection context if available
+        reflection_context = ""
+        if reflection is not None:
+            reflection_context = f"""
+## Prior Analysis: {ticker}
+- **Decision Date**: {reflection.decision_date}
+- **Decision**: {reflection.decision_verdict}
+- **Realized Return**: {reflection.realized_return:+.2%}
+- **Classification**: {reflection.classification.upper()}
+- **Lesson**: {reflection.lesson_text}
+
+Please weigh this prior outcome in your current analysis.
+
+"""
+
         # Build the prompt (D-16: state the z-score as input evidence, not the conclusion)
         prompt = f"""You are a research analyst evaluating momentum-based investment theses.
 
@@ -119,6 +138,8 @@ def create_momentum_llm_node(llm):
 
 **Market Context**:
 {market_report}
+
+{reflection_context}
 
 Your task:
 1. Treat the momentum metrics above as input data to weigh alongside other context
