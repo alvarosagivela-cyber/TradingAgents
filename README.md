@@ -61,6 +61,12 @@ TradingAgents is a multi-agent trading framework that mirrors the dynamics of re
 
 ## About This Fork — CTA Boutique con Agentes IA
 
+**In one line:** A momentum-based CTA architecture that replicates an institutional investment committee's separation of powers — Research, Auditor, Risk, and Execution as genuinely independent agents, not four prompts wearing different hats.
+
+Built on the classic Jegadeesh-Titman 12-1 momentum signal, this system tests a specific hypothesis: that structural independence between a thesis-generating agent and a thesis-auditing agent produces measurably better risk-adjusted decisions than a single model doing both jobs. The Risk layer applies position-sizing and concentration limits from three distinct risk postures (conservative/balanced/aggressive) before any trade reaches execution — and that veto is enforced at the graph-topology level, not by a runtime check that a future refactor could quietly break. Execution runs exclusively against Alpaca paper trading; the validation goal (Phase 7) is running this committee for 4-6 weeks and confirming the Auditor actually catches theses Research alone would have missed.
+
+This isn't a backtested strategy claiming alpha — it's an architecture-validation exercise, and the repo is explicit about that. What's being tested is whether "genuine independence" between agents is worth the engineering cost, with every isolation and veto guarantee backed by automated tests, not just design intent.
+
 This fork extends the upstream TradingAgents framework with a **separation-of-powers architecture** modeled on how a human investment committee actually works, built entirely on Claude (Haiku/Sonnet) via LangGraph:
 
 - **Research** — proposes a momentum thesis (buy/sell/hold) with a deterministic, Python-computed data foundation and an explicit, traceable reasoning chain.
