@@ -30,15 +30,21 @@ def _has_real_anthropic_key():
 
 
 @pytest.mark.smoke
-@pytest.mark.skipif(
-    not _has_real_anthropic_key(),
-    reason="ANTHROPIC_API_KEY not set (or placeholder); skipping live Anthropic + yfinance e2e smoke test",
-)
 class TestCliE2ESmoke(unittest.TestCase):
     """End-to-end CLI test: analyze flow with real LLM + data sources."""
 
     def test_analyze_end_to_end_produces_report(self):
         """Full CLI analyze flow: ticker → analysts → debate → report on disk."""
+        # Checked at test-run time, not at collection time (module-level skipif
+        # is evaluated once during pytest collection, before tradingagents.__init__'s
+        # load_dotenv() side effect has necessarily run for every module — making
+        # the skip decision depend on test collection order). Checking here reads
+        # the environment as it actually stands when this test executes.
+        if not _has_real_anthropic_key():
+            self.skipTest(
+                "ANTHROPIC_API_KEY not set (or placeholder); skipping live Anthropic + yfinance e2e smoke test"
+            )
+
         import cli.main as m
         from cli.models import AnalystType
 
