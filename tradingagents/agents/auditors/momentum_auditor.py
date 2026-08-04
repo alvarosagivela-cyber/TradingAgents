@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from tradingagents.agents.reflectors.reflection_reader import read_reflection_for_ticker
 from tradingagents.agents.schemas import AuditorVerdict
 from tradingagents.agents.utils.momentum_calculator import (
     compute_momentum,
@@ -132,6 +133,24 @@ def create_auditor_llm_node(model: str = AUDITOR_MODEL):
         auditor_z_score = state.get("auditor_z_score", 0.0)
         research_verdict = state.get("thesis_verdict", "")
 
+        # Read prior reflection from the auditor layer (before prompt construction)
+        reflection = read_reflection_for_ticker("auditor", ticker)
+
+        # Build reflection context if available
+        reflection_context = ""
+        if reflection is not None:
+            reflection_context = f"""
+## Prior Auditor Analysis: {ticker}
+- **Decision Date**: {reflection.decision_date}
+- **Decision**: {reflection.decision_verdict}
+- **Realized Return**: {reflection.realized_return:+.2%}
+- **Classification**: {reflection.classification.upper()}
+- **Lesson**: {reflection.lesson_text}
+
+Incorporate this prior analysis into your refutation reasoning.
+
+"""
+
         # Build prompt with asymmetric refutation mandate (D-04)
         # The key difference from Research's neutral analysis: explicit instruction to find reasons
         # the Research thesis could be WRONG.
@@ -149,6 +168,8 @@ not as evidence to confirm.
 
 **Research's Verdict** (what you are tasked to refute):
 {research_verdict}
+
+{reflection_context}
 
 Your task:
 1. Treat the Research verdict as a hypothesis to test, not as established fact
