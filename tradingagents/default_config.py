@@ -86,6 +86,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "auditor_log_path": os.getenv("TRADINGAGENTS_AUDITOR_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "auditor", "audits.jsonl")),
     # Risk Squad cycle audit trail (append-only JSONL) — Phase 4 Risk layer output (EVERY cycle persisted, including vetoed, D-06/RISK-01)
     "risk_log_path": os.getenv("TRADINGAGENTS_RISK_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "risk", "decisions.jsonl")),
+    # Phase 5: Per-layer reflection stores (memory of past decisions + realized outcomes, MEM-01)
+    "research_reflections_log_path": os.getenv("TRADINGAGENTS_RESEARCH_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "research_reflections.jsonl")),
+    "auditor_reflections_log_path": os.getenv("TRADINGAGENTS_AUDITOR_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "auditor_reflections.jsonl")),
+    "risk_reflections_log_path": os.getenv("TRADINGAGENTS_RISK_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "risk_reflections.jsonl")),
     # Risk Squad position sizing: deterministic dollar sizing input the Risk Squad votes on (2% of portfolio equity per proposed trade; D-03)
     "risk_position_size_pct": 0.02,
     # Risk Squad concentration threshold: single-ticker concentration limit cited as reference in each perspective's prompt
