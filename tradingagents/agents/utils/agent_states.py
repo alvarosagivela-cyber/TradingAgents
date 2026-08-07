@@ -70,7 +70,7 @@ class AgentState(MessagesState):
     comparison_result: Annotated[str, "match|mismatch|not_reached — thesis_verdict vs auditor_verdict comparison, persisted UNCONDITIONALLY including refuted cycles (D-06)"]
 
     # risk squad fields (Phase 4 — RISK-01/02/EXEC-01)
-    proposed_side: Annotated[str, "Buy|Hold|Sell — deterministically parsed from trader_investment_plan's FINAL TRANSACTION PROPOSAL trailer via parse_trader_action, never re-interpreted by an LLM"]
+    proposed_side: Annotated[str, "Buy|Hold|Sell — deterministically parsed from trader_investment_plan's FINAL TRANSACTION PROPOSAL trailer via parse_trader_action; trader_investment_plan itself is now rendered by the deterministic Trader node (Phase 05.1, D-03/D-04) from the Auditor's comparison_result, not by an LLM — no LLM anywhere in this chain"]
     portfolio_snapshot_status: Annotated[str, "pass|fail — pass when the Alpaca paper account snapshot (04-02-PLAN.md) succeeds; fail triggers a deterministic veto safety-net regardless of perspective verdicts"]
     portfolio_total_value: Annotated[float, "Alpaca paper account equity, pre-computed by Python — never LLM-estimated, prevents numerical hallucination"]
     existing_position_value: Annotated[float, "Dollar market value of any existing position in company_of_interest on the Alpaca paper account, 0.0 if none"]
