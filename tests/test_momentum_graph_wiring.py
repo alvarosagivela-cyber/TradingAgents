@@ -3,7 +3,7 @@
 This test verifies the graph topology without compiling or invoking any LLM.
 It ensures that the momentum research pipeline (Compute -> LLM -> Validate) is
 properly integrated into the main workflow, connecting from the last analyst
-to Bull Researcher.
+to the Auditor chain (Phase 05.1 post-wiring).
 """
 
 import pytest
@@ -36,7 +36,7 @@ def test_momentum_nodes_in_graph():
 
 @pytest.mark.unit
 def test_momentum_edges_in_graph():
-    """Test that momentum nodes are correctly wired together and to Bull Researcher."""
+    """Test that momentum nodes are correctly wired together and to Auditor Compute."""
     tool_nodes = {
         k: MagicMock() for k in ("market", "social", "news", "fundamentals")
     }
@@ -49,7 +49,7 @@ def test_momentum_edges_in_graph():
     expected_edges = [
         ("Momentum Compute", "Momentum LLM"),
         ("Momentum LLM", "Momentum Validate"),
-        ("Momentum Validate", "Bull Researcher"),
+        ("Momentum Validate", "Auditor Compute"),
     ]
 
     for source, target in expected_edges:
@@ -93,8 +93,12 @@ def test_last_analyst_edges_to_momentum():
 
 
 @pytest.mark.unit
-def test_momentum_validate_reaches_bull_researcher():
-    """Test that momentum validation output reaches Bull Researcher (not a dead end)."""
+def test_momentum_validate_reaches_auditor_compute():
+    """Test that momentum validation output reaches Auditor Compute directly (Phase 05.1 wiring).
+
+    After Phase 05.1, momentum validation flows directly to the Auditor chain,
+    replacing the retired Bull Researcher/Bear Researcher/Research Manager debate layer.
+    """
     tool_nodes = {
         k: MagicMock() for k in ("market", "social", "news", "fundamentals")
     }
@@ -103,5 +107,5 @@ def test_momentum_validate_reaches_bull_researcher():
 
     workflow = graph_setup.setup_graph()
 
-    # Walk from Momentum Validate to ensure it reaches Bull Researcher
-    assert ("Momentum Validate", "Bull Researcher") in workflow.edges
+    # Walk from Momentum Validate to ensure it reaches Auditor Compute
+    assert ("Momentum Validate", "Auditor Compute") in workflow.edges
