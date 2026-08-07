@@ -16,6 +16,9 @@ _AGENTS_DIR = Path(__file__).resolve().parents[1] / "tradingagents" / "agents"
 
 # Every node whose text reaches the saved report. If you add a report-producing
 # agent, add it here — and make it call get_language_instruction().
+# NOTE: trader/trader.py is excluded (as of Phase 05.1) because it is now a
+# deterministic function, not an LLM-based agent, and produces fixed markdown
+# that doesn't require language instruction handling.
 REPORT_AGENTS = [
     "analysts/market_analyst.py",
     "analysts/news_analyst.py",
@@ -28,7 +31,6 @@ REPORT_AGENTS = [
     "risk_mgmt/aggressive_perspective.py",
     "risk_mgmt/conservative_perspective.py",
     "risk_mgmt/balanced_perspective.py",
-    "trader/trader.py",
 ]
 
 
