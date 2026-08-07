@@ -90,6 +90,8 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "research_reflections_log_path": os.getenv("TRADINGAGENTS_RESEARCH_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "research_reflections.jsonl")),
     "auditor_reflections_log_path": os.getenv("TRADINGAGENTS_AUDITOR_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "auditor_reflections.jsonl")),
     "risk_reflections_log_path": os.getenv("TRADINGAGENTS_RISK_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "risk_reflections.jsonl")),
+    # Phase 6: LLM cost tracking (append-only JSONL, one CostRecord per real LLM call, D-04)
+    "cost_log_path": os.getenv("TRADINGAGENTS_COST_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "cost", "llm_calls.jsonl")),
     # Risk Squad position sizing: deterministic dollar sizing input the Risk Squad votes on (2% of portfolio equity per proposed trade; D-03)
     "risk_position_size_pct": 0.02,
     # Risk Squad concentration threshold: single-ticker concentration limit cited as reference in each perspective's prompt
