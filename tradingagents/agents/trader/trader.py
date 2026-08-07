@@ -1,4 +1,14 @@
-"""Trader: turns the Research Manager's investment plan into a concrete transaction proposal."""
+"""Trader: deterministic mapping from Auditor's comparison_result to transaction proposal.
+
+Phase 05.1 D-04: The Trader is no longer an LLM node. It is a pure function
+that implements D-03's 3-case mapping:
+  - comparison_result == "match" -> thesis_verdict passes through
+  - comparison_result == "mismatch" -> veto to Hold (refutation is never averaged)
+  - comparison_result == "not_reached" -> fail-closed to Hold (incomplete audit is never implicit approval)
+
+This removes one LLM call per decision cycle and ensures the Auditor's verdict
+gates execution, not just informs it.
+"""
 
 from __future__ import annotations
 
@@ -6,57 +16,69 @@ import functools
 
 from langchain_core.messages import AIMessage
 
-from tradingagents.agents.schemas import TraderProposal, render_trader_proposal
-from tradingagents.agents.utils.agent_utils import (
-    get_instrument_context_from_state,
-    get_language_instruction,
-)
-from tradingagents.agents.utils.structured import (
-    NO_EXTERNAL_TOOLS,
-    bind_structured,
-    invoke_structured_or_freetext,
-)
+from tradingagents.agents.schemas import TraderAction, TraderProposal, render_trader_proposal
 
 
-def create_trader(llm):
-    structured_llm = bind_structured(llm, TraderProposal, "Trader")
+def _map_comparison_to_action(comparison_result: str, thesis_verdict: str) -> TraderAction:
+    """Pure function implementing D-03's comparison_result -> action mapping.
+
+    Args:
+        comparison_result: One of "match" | "mismatch" | "not_reached"
+        thesis_verdict: The research verdict ("Buy" | "Hold" | "Sell"), or empty string
+
+    Returns:
+        TraderAction: The deterministic action mapped from the comparison result
+    """
+    if comparison_result == "match":
+        # Research verdict confirmed by Auditor, passes through
+        try:
+            return TraderAction(thesis_verdict)
+        except ValueError:
+            # thesis_verdict is empty or malformed; fail-closed
+            return TraderAction.HOLD
+    else:
+        # comparison_result == "mismatch" or "not_reached"
+        # Refutation is a veto (never averaged). Incomplete audit is never implicit approval.
+        return TraderAction.HOLD
+
+
+def create_trader():
+    """Factory for the deterministic Trader node (D-04).
+
+    The Trader reads the Auditor's comparison_result and the research thesis_verdict,
+    then applies D-03's 3-case mapping to produce a transaction proposal.
+    No LLM calls, no arguments to the factory.
+
+    Returns:
+        Callable[[dict], dict]: Node function that takes state dict, returns update dict
+    """
 
     def trader_node(state, name):
         company_name = state["company_of_interest"]
-        instrument_context = get_instrument_context_from_state(state)
-        investment_plan = state["investment_plan"]
+        comparison_result = state.get("comparison_result", "not_reached")
+        thesis_verdict = state.get("thesis_verdict", "")
 
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a trading agent analyzing market data to make investment decisions. "
-                    "Based on your analysis, provide a specific recommendation to buy, sell, or hold. "
-                    "Anchor your reasoning in the analysts' reports and the research plan. "
-                    + NO_EXTERNAL_TOOLS
-                    + get_language_instruction()
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"Based on a comprehensive analysis by a team of analysts, here is an investment "
-                    f"plan tailored for {company_name}. {instrument_context} This plan incorporates "
-                    f"insights from current technical market trends, macroeconomic indicators, and "
-                    f"social media sentiment. Use this plan as a foundation for evaluating your next "
-                    f"trading decision.\n\nProposed Investment Plan: {investment_plan}\n\n"
-                    f"Leverage these insights to make an informed and strategic decision."
-                ),
-            },
-        ]
+        # Apply the deterministic mapping
+        action = _map_comparison_to_action(comparison_result, thesis_verdict)
 
-        trader_plan = invoke_structured_or_freetext(
-            structured_llm,
-            llm,
-            messages,
-            render_trader_proposal,
-            "Trader",
+        # Build reasoning that names the mapping and the inputs it consumed
+        reasoning = (
+            f"Deterministic mapping from Auditor's comparison_result='{comparison_result}' "
+            f"and thesis_verdict='{thesis_verdict}': action={action.value} "
+            f"(D-03: match→pass-through, mismatch→hold, not_reached→hold)"
         )
+
+        # Construct the proposal
+        proposal = TraderProposal(
+            action=action,
+            reasoning=reasoning,
+            entry_price=None,
+            stop_loss=None,
+            position_sizing=None,
+        )
+
+        # Render to markdown (same format as the old LLM node, so downstream code doesn't change)
+        trader_plan = render_trader_proposal(proposal)
 
         return {
             "messages": [AIMessage(content=trader_plan)],

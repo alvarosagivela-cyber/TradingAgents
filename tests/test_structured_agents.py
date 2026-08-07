@@ -123,33 +123,8 @@ class TestRenderResearchPlan:
 
 
 # ---------------------------------------------------------------------------
-# Trader agent: structured happy path + fallback
+# Trader node: deterministic mapping from comparison_result to action
 # ---------------------------------------------------------------------------
-
-
-def _make_trader_state():
-    return {
-        "company_of_interest": "NVDA",
-        "investment_plan": "**Recommendation**: Buy\n**Rationale**: ...\n**Strategic Actions**: ...",
-    }
-
-
-def _structured_trader_llm(captured: dict, proposal: TraderProposal | None = None):
-    """Build a MagicMock LLM whose with_structured_output binding captures the
-    prompt and returns a real TraderProposal so render_trader_proposal works.
-    """
-    if proposal is None:
-        proposal = TraderProposal(
-            action=TraderAction.BUY,
-            reasoning="Strong setup.",
-        )
-    structured = MagicMock()
-    structured.invoke.side_effect = lambda prompt: (
-        captured.__setitem__("prompt", prompt) or proposal
-    )
-    llm = MagicMock()
-    llm.with_structured_output.return_value = structured
-    return llm
 
 
 @pytest.mark.unit
@@ -171,46 +146,116 @@ def test_invoke_structured_falls_back_when_result_is_none():
 
 
 @pytest.mark.unit
-class TestTraderAgent:
-    def test_structured_path_produces_rendered_markdown(self):
-        captured = {}
-        proposal = TraderProposal(
-            action=TraderAction.BUY,
-            reasoning="AI capex cycle intact; institutional flows constructive.",
-            entry_price=189.5,
-            stop_loss=178.0,
-            position_sizing="6% of portfolio",
-        )
-        llm = _structured_trader_llm(captured, proposal)
-        trader = create_trader(llm)
-        result = trader(_make_trader_state())
+class TestTraderNode:
+    """Tests for the deterministic Trader node (D-03/D-04).
+
+    The Trader is no longer an LLM; it is a pure function that maps
+    comparison_result (match/mismatch/not_reached) and thesis_verdict
+    to a TraderAction following D-03's 3-case rule:
+    - match: pass through thesis_verdict
+    - mismatch: veto to Hold
+    - not_reached: fail-closed to Hold
+    """
+
+    def test_comparison_match_buy_renders_buy_trailer(self):
+        """Case: comparison_result='match', thesis_verdict='Buy' -> FINAL TRANSACTION PROPOSAL: **BUY**"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            "comparison_result": "match",
+            "thesis_verdict": "Buy",
+        })
         plan = result["trader_investment_plan"]
-        assert "**Action**: Buy" in plan
-        assert "**Entry Price**: 189.5" in plan
         assert "FINAL TRANSACTION PROPOSAL: **BUY**" in plan
-        # The same rendered markdown is also added to messages for downstream agents.
+        assert "**Action**: Buy" in plan
+        # Rendered markdown is in messages too
         assert plan in result["messages"][0].content
+        assert result["sender"] == "Trader"
 
-    def test_prompt_includes_investment_plan(self):
-        captured = {}
-        llm = _structured_trader_llm(captured)
-        trader = create_trader(llm)
-        trader(_make_trader_state())
-        # The investment plan is in the user message of the captured prompt.
-        prompt = captured["prompt"]
-        assert any("Proposed Investment Plan" in m["content"] for m in prompt)
+    def test_comparison_mismatch_buy_renders_hold_trailer(self):
+        """Case: comparison_result='mismatch', thesis_verdict='Buy' (refutation) -> FINAL TRANSACTION PROPOSAL: **HOLD**"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            "comparison_result": "mismatch",
+            "thesis_verdict": "Buy",
+        })
+        plan = result["trader_investment_plan"]
+        # Refutation is a veto, never an average; hold unconditionally
+        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in plan
+        assert "**Action**: Hold" in plan
 
-    def test_falls_back_to_freetext_when_structured_unavailable(self):
-        plain_response = (
-            "**Action**: Sell\n\nGuidance cut hits margins.\n\n"
-            "FINAL TRANSACTION PROPOSAL: **SELL**"
-        )
-        llm = MagicMock()
-        llm.with_structured_output.side_effect = NotImplementedError("provider unsupported")
-        llm.invoke.return_value = MagicMock(content=plain_response)
-        trader = create_trader(llm)
-        result = trader(_make_trader_state())
-        assert result["trader_investment_plan"] == plain_response
+    def test_comparison_not_reached_renders_hold_trailer(self):
+        """Case: comparison_result='not_reached' (Auditor data check failed) -> FINAL TRANSACTION PROPOSAL: **HOLD**"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            "comparison_result": "not_reached",
+            "thesis_verdict": "Buy",
+        })
+        plan = result["trader_investment_plan"]
+        # Absence of completed audit is never implicit approval
+        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in plan
+        assert "**Action**: Hold" in plan
+
+    def test_comparison_match_sell_renders_sell_trailer(self):
+        """Case: comparison_result='match', thesis_verdict='Sell' -> FINAL TRANSACTION PROPOSAL: **SELL**"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            "comparison_result": "match",
+            "thesis_verdict": "Sell",
+        })
+        plan = result["trader_investment_plan"]
+        # Pass-through works for all 3 tiers, not just Buy
+        assert "FINAL TRANSACTION PROPOSAL: **SELL**" in plan
+        assert "**Action**: Sell" in plan
+
+    def test_create_trader_takes_no_arguments(self):
+        """Case: create_trader() accepts zero required arguments (proves LLM is actually gone)"""
+        import inspect
+        sig = inspect.signature(create_trader)
+        # No required parameters
+        assert len(sig.parameters) == 0, f"Expected 0 required params, got {len(sig.parameters)}"
+        # Verify it's callable and returns a node function
+        trader = create_trader()
+        assert callable(trader)
+
+    def test_missing_comparison_result_defaults_to_not_reached(self):
+        """If comparison_result is missing, default to 'not_reached' (fail-closed)"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            # comparison_result missing
+            "thesis_verdict": "Buy",
+        })
+        plan = result["trader_investment_plan"]
+        # Missing comparison_result should fail-closed to Hold
+        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in plan
+
+    def test_missing_thesis_verdict_defaults_to_empty(self):
+        """If thesis_verdict is missing or empty, fall back to Hold (fail-closed)"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            "comparison_result": "match",
+            # thesis_verdict missing
+        })
+        plan = result["trader_investment_plan"]
+        # Empty thesis_verdict with match should fall back to Hold (TraderAction constructor raises ValueError)
+        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in plan
+
+    def test_malformed_thesis_verdict_falls_back_to_hold(self):
+        """If thesis_verdict is not a valid TraderAction, fall back to Hold"""
+        trader = create_trader()
+        result = trader({
+            "company_of_interest": "NVDA",
+            "comparison_result": "match",
+            "thesis_verdict": "InvalidAction",  # Not in Buy/Hold/Sell
+        })
+        plan = result["trader_investment_plan"]
+        # Invalid thesis_verdict should fail-closed to Hold
+        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in plan
 
 
 # ---------------------------------------------------------------------------

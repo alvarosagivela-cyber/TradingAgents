@@ -18,7 +18,6 @@ import pytest
 import tradingagents.agents.analysts.sentiment_analyst as sentiment
 from tradingagents.agents.managers.portfolio_manager import create_portfolio_manager
 from tradingagents.agents.managers.research_manager import create_research_manager
-from tradingagents.agents.trader.trader import create_trader
 from tradingagents.agents.utils.structured import NO_EXTERNAL_TOOLS
 
 
@@ -41,19 +40,6 @@ def _prompt_text(prompt) -> str:
     for m in prompt:
         parts.append(m.get("content", "") if isinstance(m, dict) else getattr(m, "content", ""))
     return "\n".join(str(p) for p in parts)
-
-
-@pytest.mark.unit
-def test_trader_prompt_states_constraint():
-    from tradingagents.agents.schemas import TraderAction, TraderProposal
-
-    captured = {}
-    llm = _capturing_llm(captured, TraderProposal(action=TraderAction.BUY, reasoning="x"))
-    create_trader(llm)({
-        "company_of_interest": "NVDA",
-        "investment_plan": "**Recommendation**: Buy",
-    })
-    assert NO_EXTERNAL_TOOLS in _prompt_text(captured["prompt"])
 
 
 @pytest.mark.unit
