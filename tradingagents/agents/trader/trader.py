@@ -54,7 +54,6 @@ def create_trader():
     """
 
     def trader_node(state, name):
-        company_name = state["company_of_interest"]
         comparison_result = state.get("comparison_result", "not_reached")
         thesis_verdict = state.get("thesis_verdict", "")
 

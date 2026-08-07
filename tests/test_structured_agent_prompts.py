@@ -85,7 +85,6 @@ def test_portfolio_manager_prompt_states_constraint():
     create_portfolio_manager(llm)({
         "company_of_interest": "NVDA",
         "risk_debate_state": risk,
-        "investment_plan": "plan",
         "trader_investment_plan": "trader plan",
     })
     assert NO_EXTERNAL_TOOLS in _prompt_text(captured["prompt"])

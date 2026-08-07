@@ -28,7 +28,6 @@ def create_portfolio_manager(llm):
     def portfolio_manager_node(state) -> dict:
         instrument_context = get_instrument_context_from_state(state)
 
-        research_plan = state["investment_plan"]
         trader_plan = state["trader_investment_plan"]
 
         # Read Risk Squad verdicts via .get() for safe defaults
@@ -71,8 +70,7 @@ def create_portfolio_manager(llm):
 - **Sell**: Exit position or avoid entry
 
 **Context:**
-- Research Manager's investment plan: **{research_plan}**
-- Trader's transaction proposal: **{trader_plan}**
+- Trader's transaction proposal (deterministically gated by the independent Auditor's verdict): **{trader_plan}**
 {lessons_line}
 **Risk Squad Verdicts:**
 {risk_summary}

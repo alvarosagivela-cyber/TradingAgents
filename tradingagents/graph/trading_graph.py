@@ -508,7 +508,6 @@ class TradingAgentsGraph:
             "final_veto": final_state.get("final_veto"),
             "paper_execution_status": final_state.get("paper_execution_status"),
             "paper_order_id": final_state.get("paper_order_id"),
-            "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
         }
 
