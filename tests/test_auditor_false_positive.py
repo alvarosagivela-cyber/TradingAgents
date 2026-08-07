@@ -414,3 +414,118 @@ class TestAuditorFalsePositiveAnalyzer:
         assert result["top_false_positives"][0]["realized_return"] == pytest.approx(-0.10)
         # Best of the top 5 should be -0.06
         assert result["top_false_positives"][4]["realized_return"] == pytest.approx(-0.06)
+
+
+class TestAuditorFalsePositiveReport:
+    """Tests for the auditor_false_positive_report CLI script."""
+
+    def test_cli_insufficient_data_banner(self, auditor_reflections_fixture: Path):
+        """Test that CLI prints INSUFFICIENT DATA banner when samples are low."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from scripts.auditor_false_positive_report import main
+
+        set_config({"auditor_reflections_log_path": str(auditor_reflections_fixture)})
+
+        # Capture output
+        import io
+        import sys
+
+        captured_output = io.StringIO()
+        original_stdout = sys.stdout
+        sys.stdout = captured_output
+
+        try:
+            exit_code = main(["--min-samples", "10"])
+        finally:
+            sys.stdout = original_stdout
+
+        output = captured_output.getvalue()
+
+        # Should print INSUFFICIENT DATA banner (with min_samples=10, Sell count is 5)
+        assert "INSUFFICIENT DATA" in output
+        assert exit_code == 0
+
+    def test_cli_sufficient_data_no_banner(self, auditor_reflections_fixture: Path):
+        """Test that CLI does NOT print banner when samples are sufficient."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from scripts.auditor_false_positive_report import main
+
+        set_config({"auditor_reflections_log_path": str(auditor_reflections_fixture)})
+
+        # Capture output
+        import io
+        import sys
+
+        captured_output = io.StringIO()
+        original_stdout = sys.stdout
+        sys.stdout = captured_output
+
+        try:
+            exit_code = main(["--min-samples", "1"])
+        finally:
+            sys.stdout = original_stdout
+
+        output = captured_output.getvalue()
+
+        # With min_samples=1, both Buy (10) and Sell (5) are sufficient
+        assert "INSUFFICIENT DATA" not in output
+        # Should print both BUY and SELL lines
+        assert "BUY verdict" in output or "Buy" in output
+        assert "SELL verdict" in output or "Sell" in output
+        assert exit_code == 0
+
+    def test_cli_buy_negative_percentage_displayed(self, auditor_reflections_fixture: Path):
+        """Test that CLI displays Buy -> Negative percentage."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from scripts.auditor_false_positive_report import main
+
+        set_config({"auditor_reflections_log_path": str(auditor_reflections_fixture)})
+
+        # Capture output
+        import io
+        import sys
+
+        captured_output = io.StringIO()
+        original_stdout = sys.stdout
+        sys.stdout = captured_output
+
+        try:
+            exit_code = main(["--min-samples", "1"])
+        finally:
+            sys.stdout = original_stdout
+
+        output = captured_output.getvalue()
+
+        # With 10 Buy total, 3 negative -> 30% false positive rate
+        assert "30.0%" in output or "0.3" in output or "3 / 10" in output
+        assert exit_code == 0
+
+    def test_cli_sell_positive_percentage_displayed(self, auditor_reflections_fixture: Path):
+        """Test that CLI displays Sell -> Positive percentage."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from scripts.auditor_false_positive_report import main
+
+        set_config({"auditor_reflections_log_path": str(auditor_reflections_fixture)})
+
+        # Capture output
+        import io
+        import sys
+
+        captured_output = io.StringIO()
+        original_stdout = sys.stdout
+        sys.stdout = captured_output
+
+        try:
+            exit_code = main(["--min-samples", "1"])
+        finally:
+            sys.stdout = original_stdout
+
+        output = captured_output.getvalue()
+
+        # With 5 Sell total, 2 positive -> 40% missed opportunity rate
+        assert "40.0%" in output or "0.4" in output or "2 / 5" in output
+        assert exit_code == 0
