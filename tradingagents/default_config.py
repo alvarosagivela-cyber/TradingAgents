@@ -92,6 +92,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "risk_reflections_log_path": os.getenv("TRADINGAGENTS_RISK_REFLECTIONS_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "reflections", "risk_reflections.jsonl")),
     # Phase 6: LLM cost tracking (append-only JSONL, one CostRecord per real LLM call, D-04)
     "cost_log_path": os.getenv("TRADINGAGENTS_COST_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "cost", "llm_calls.jsonl")),
+    # Phase 6: Budget configuration (D-06) — alert when running total reaches threshold
+    "annual_budget_target_usd": 630.0,  # Midpoint of $540-720/año target from 02-presupuesto.md
+    "budget_alert_threshold_pct": 0.80,  # Alert when 80% of annual_budget_target_usd is reached
     # Risk Squad position sizing: deterministic dollar sizing input the Risk Squad votes on (2% of portfolio equity per proposed trade; D-03)
     "risk_position_size_pct": 0.02,
     # Risk Squad concentration threshold: single-ticker concentration limit cited as reference in each perspective's prompt
