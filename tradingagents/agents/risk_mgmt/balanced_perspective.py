@@ -52,6 +52,7 @@ def create_balanced_perspective(model: str = RISK_MODEL):
             Dict with balanced_verdict (RiskDecision.model_dump()) or REJECTED dict on error
         """
         ticker = state.get("company_of_interest", "UNKNOWN")
+        trade_date = state.get("trade_date", "")
         proposed_side = state.get("proposed_side", "Hold")
         portfolio_total_value = state.get("portfolio_total_value", 0.0)
         existing_position_value = state.get("existing_position_value", 0.0)
@@ -120,6 +121,9 @@ on a proposed trade. Your role is to weigh both upside opportunity and downside 
                 model,
                 temperature=0.3,
                 max_tokens=1000,
+                layer="balanced",
+                ticker=ticker,
+                trade_date=trade_date,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Balanced: Failed to create LLM client: {exc}")

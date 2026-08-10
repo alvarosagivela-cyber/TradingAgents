@@ -114,6 +114,7 @@ def create_auditor_llm_node(model: str = AUDITOR_MODEL):
             or INCONCLUSIVE dict if phase1_status != "pass" or LLM fails
         """
         ticker = state.get("company_of_interest")
+        trade_date = state.get("trade_date", "")
         phase1_status = state.get("auditor_phase1_status", "fail")
 
         # Short-circuit if compute phase failed (D-02: fail-open, never invoke LLM)
@@ -194,6 +195,9 @@ Output a structured verdict with:
                 "anthropic",
                 model,
                 max_tokens=2000,
+                layer="auditor",
+                ticker=ticker,
+                trade_date=trade_date,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Auditor: Failed to create LLM client: {exc}")

@@ -55,6 +55,7 @@ def create_aggressive_perspective(model: str = RISK_MODEL):
             Dict with aggressive_verdict (RiskDecision.model_dump()) or REJECTED dict on error
         """
         ticker = state.get("company_of_interest", "UNKNOWN")
+        trade_date = state.get("trade_date", "")
         proposed_side = state.get("proposed_side", "Hold")
         portfolio_total_value = state.get("portfolio_total_value", 0.0)
         existing_position_value = state.get("existing_position_value", 0.0)
@@ -127,6 +128,9 @@ This is a hard boundary, not a soft guideline.
                 model,
                 temperature=0.4,
                 max_tokens=1000,
+                layer="aggressive",
+                ticker=ticker,
+                trade_date=trade_date,
             ).get_llm()
         except Exception as exc:
             logger.exception(f"Aggressive: Failed to create LLM client: {exc}")
