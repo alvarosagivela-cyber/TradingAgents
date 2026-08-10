@@ -14,6 +14,7 @@ import json
 import logging
 import tempfile
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
@@ -21,6 +22,7 @@ import pytest
 
 from tradingagents.jobs.cost_aggregator import summarize_costs
 from tradingagents.llm_clients.cost_tracker import CostRecord
+from scripts.cost_budget_report import main as cli_main
 
 
 @pytest.mark.unit
@@ -307,3 +309,170 @@ class TestCostAggregator:
 
             assert result["annual_budget_target_usd"] == 630.0
             assert result["budget_alert_threshold_pct"] == 0.80
+
+
+@pytest.mark.unit
+class TestCostBudgetReportCLI:
+    """Verify CLI budget report formatting and alert banner."""
+
+    def test_cli_budget_report_over_threshold(self, capsys):
+        """Given cost log exceeding 80% threshold, CLI prints BUDGET ALERT banner and returns 0."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cost_log_path = Path(tmpdir) / "cost.jsonl"
+
+            # Create record that projects to >= 80% of $630 = $504
+            earliest_ts = "2026-08-09T12:00:00+00:00"
+            fixed_now = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+            record = CostRecord(
+                timestamp=earliest_ts,
+                layer="research",
+                model="claude-haiku-4-5",
+                ticker="AAPL",
+                trade_date="2026-08-10",
+                input_tokens=100,
+                output_tokens=50,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+                cost_usd=520.0 / 365.0,  # Projects to $520/year
+            )
+
+            with open(cost_log_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(record.to_json_dict()) + "\n")
+
+            config_dict = {
+                "cost_log_path": str(cost_log_path),
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80,
+            }
+
+            # Mock get_config in both the CLI and the aggregator module
+            with mock.patch(
+                "tradingagents.jobs.cost_aggregator.get_config",
+                return_value=config_dict
+            ):
+                with mock.patch(
+                    "tradingagents.jobs.cost_aggregator.datetime"
+                ) as mock_datetime:
+                    mock_datetime.now.return_value = fixed_now
+                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                    mock_datetime.timezone.utc = timezone.utc
+                    exit_code = cli_main([])
+
+            captured = capsys.readouterr()
+            assert "BUDGET ALERT" in captured.out
+            assert exit_code == 0
+
+    def test_cli_budget_report_below_threshold(self, capsys):
+        """Given cost log below 80% threshold, CLI does NOT print BUDGET ALERT but shows breakdown."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cost_log_path = Path(tmpdir) / "cost.jsonl"
+
+            # Create record that projects to < 80% of $630 = $504
+            earliest_ts = "2026-08-09T12:00:00+00:00"
+            fixed_now = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+            record = CostRecord(
+                timestamp=earliest_ts,
+                layer="auditor",
+                model="claude-sonnet-5",
+                ticker="MSFT",
+                trade_date="2026-08-10",
+                input_tokens=500,
+                output_tokens=200,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+                cost_usd=100.0 / 365.0,  # Projects to $100/year
+            )
+
+            with open(cost_log_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(record.to_json_dict()) + "\n")
+
+            config_dict = {
+                "cost_log_path": str(cost_log_path),
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80,
+            }
+
+            with mock.patch(
+                "tradingagents.jobs.cost_aggregator.get_config",
+                return_value=config_dict
+            ):
+                with mock.patch(
+                    "tradingagents.jobs.cost_aggregator.datetime"
+                ) as mock_datetime:
+                    mock_datetime.now.return_value = fixed_now
+                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                    mock_datetime.timezone.utc = timezone.utc
+                    exit_code = cli_main([])
+
+            captured = capsys.readouterr()
+            assert "BUDGET ALERT" not in captured.out
+            # Should still show the breakdown tables
+            assert "auditor" in captured.out or "claude-sonnet-5" in captured.out or "100" in captured.out
+            assert exit_code == 0
+
+    def test_cli_budget_report_shows_breakdown_tables(self, capsys):
+        """CLI shows per-layer and per-model breakdown tables."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cost_log_path = Path(tmpdir) / "cost.jsonl"
+
+            earliest_ts = "2026-08-09T12:00:00+00:00"
+            fixed_now = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+            # Create two records from different layers/models
+            records = [
+                CostRecord(
+                    timestamp=earliest_ts,
+                    layer="research",
+                    model="claude-haiku-4-5",
+                    ticker="AAPL",
+                    trade_date="2026-08-10",
+                    input_tokens=100,
+                    output_tokens=50,
+                    cache_read_input_tokens=0,
+                    cache_creation_input_tokens=0,
+                    cost_usd=0.15,
+                ),
+                CostRecord(
+                    timestamp=earliest_ts,
+                    layer="auditor",
+                    model="claude-sonnet-5",
+                    ticker="AAPL",
+                    trade_date="2026-08-10",
+                    input_tokens=500,
+                    output_tokens=200,
+                    cache_read_input_tokens=0,
+                    cache_creation_input_tokens=0,
+                    cost_usd=0.30,
+                ),
+            ]
+
+            with open(cost_log_path, "w", encoding="utf-8") as f:
+                for record in records:
+                    f.write(json.dumps(record.to_json_dict()) + "\n")
+
+            config_dict = {
+                "cost_log_path": str(cost_log_path),
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80,
+            }
+
+            with mock.patch(
+                "tradingagents.jobs.cost_aggregator.get_config",
+                return_value=config_dict
+            ):
+                with mock.patch(
+                    "tradingagents.jobs.cost_aggregator.datetime"
+                ) as mock_datetime:
+                    mock_datetime.now.return_value = fixed_now
+                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                    mock_datetime.timezone.utc = timezone.utc
+                    exit_code = cli_main([])
+
+            captured = capsys.readouterr()
+            # Should show call count
+            assert "2" in captured.out  # call_count
+            # Should show both dollar amounts
+            assert "0.45" in captured.out
+            assert exit_code == 0
