@@ -237,6 +237,36 @@ class TestReadCostRecords:
             assert records[0].layer == "research"
             assert records[1].layer == "auditor"
 
+    def test_read_jsonl_skips_valid_json_non_dict_lines(self):
+        """A line that is valid JSON but not an object (e.g. a list or int) must be
+        skipped gracefully, not raise TypeError out of read_cost_records (regression
+        for the gap found in Phase 6 code review: from_json_dict()'s dict subscripts
+        raise TypeError on a non-dict input, which the original except tuple didn't catch).
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "cost.jsonl"
+
+            record = CostRecord(
+                timestamp="2026-08-05T10:00:00+00:00",
+                layer="research",
+                model="claude-haiku-4-5",
+                ticker="AAPL",
+                trade_date="2026-08-05",
+                input_tokens=100,
+                output_tokens=50,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+                cost_usd=0.0003,
+            )
+            with open(log_path, "w") as f:
+                f.write(json.dumps(record.to_json_dict()) + "\n")
+                f.write(json.dumps([1, 2, 3]) + "\n")  # valid JSON, not a dict
+                f.write(json.dumps(42) + "\n")  # valid JSON, not a dict
+
+            records = read_cost_records(log_path)
+            assert len(records) == 1
+            assert records[0].layer == "research"
+
 
 @pytest.mark.unit
 class TestRecordCostFromResponse:

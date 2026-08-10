@@ -243,6 +243,30 @@ class TestReconstructDecision:
         assert result["research"] is not None
         assert result["research"]["verdict"] == "Buy"
 
+    def test_valid_json_non_dict_line_skipped(self, temp_logs):
+        """A line that is valid JSON but not an object (e.g. a list or int) must be
+        skipped gracefully, not raise AttributeError out of reconstruct_decision
+        (regression for the gap found in Phase 6 code review: record.get(...) on a
+        non-dict raises AttributeError, which the original except tuple didn't catch).
+        """
+        research_log = temp_logs["research_log"]
+
+        with open(research_log, "a") as f:
+            f.write(json.dumps([1, 2, 3]) + "\n")  # valid JSON, not a dict
+            f.write(json.dumps(42) + "\n")  # valid JSON, not a dict
+
+        config = {
+            "research_thesis_log_path": str(research_log),
+            "auditor_log_path": str(temp_logs["auditor_log"]),
+            "risk_log_path": str(temp_logs["risk_log"]),
+        }
+
+        with patch("tradingagents.jobs.decision_reconstructor.get_config", return_value=config):
+            result = reconstruct_decision("AAPL", "2026-08-01")
+
+        assert result["research"] is not None
+        assert result["research"]["verdict"] == "Buy"
+
 
 @pytest.mark.unit
 class TestReconstructDecisionCLI:

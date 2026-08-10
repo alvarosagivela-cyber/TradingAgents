@@ -20,6 +20,13 @@ from tradingagents.llm_clients.cost_tracker import read_cost_records
 
 logger = logging.getLogger(__name__)
 
+# Below this elapsed window, a linear extrapolation to a full year is too noisy to
+# alert on: a burst of calls within a single short session (e.g. a few tickers run
+# in one sitting) hits the 1-hour floor below and gets multiplied by up to 365*24x,
+# which can cross the budget threshold on literally the first session ever run.
+# The raw projection is still returned for transparency; only the alert is gated.
+MIN_DAYS_ELAPSED_FOR_ALERT = 1.0
+
 
 def summarize_costs() -> dict[str, Any]:
     """Aggregate cost records into running total, layer/model breakdown, and projected-annual spend.
@@ -32,7 +39,9 @@ def summarize_costs() -> dict[str, Any]:
     - projected_annual_usd: Linear extrapolation from elapsed time to a full year
     - annual_budget_target_usd: Resolved from config (default 630.0)
     - budget_alert_threshold_pct: Resolved from config (default 0.80)
-    - over_threshold: True if projected_annual_usd >= target * threshold_pct
+    - over_threshold: True if projected_annual_usd >= target * threshold_pct AND at
+      least MIN_DAYS_ELAPSED_FOR_ALERT has elapsed since the earliest record (a burst
+      of calls within a single short session should not trigger a false alarm)
 
     When over_threshold is True, logs a warning containing "Budget alert".
     When records is empty, returns zeroed dict with no errors.
@@ -81,8 +90,13 @@ def summarize_costs() -> dict[str, Any]:
     threshold_pct = config.get("budget_alert_threshold_pct", 0.80)
     threshold_usd = target * threshold_pct
 
-    # Check if over threshold
-    over_threshold = projected_annual_usd >= threshold_usd
+    # Check if over threshold — gated on a minimum elapsed window (see
+    # MIN_DAYS_ELAPSED_FOR_ALERT) so a short burst of calls doesn't get
+    # multiplied into a false alarm before there's enough data to trust the trend.
+    over_threshold = (
+        days_elapsed >= MIN_DAYS_ELAPSED_FOR_ALERT
+        and projected_annual_usd >= threshold_usd
+    )
 
     if over_threshold:
         logger.warning(

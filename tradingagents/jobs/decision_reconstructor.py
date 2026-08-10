@@ -61,7 +61,9 @@ def _find_latest_match(
 
                 try:
                     record = json.loads(line)
-                except json.JSONDecodeError as e:
+                    if not isinstance(record, dict):
+                        raise TypeError(f"expected a JSON object, got {type(record).__name__}")
+                except (json.JSONDecodeError, TypeError) as e:
                     logger.warning(
                         f"Failed to parse line {line_num} in {log_path.name}: {e}"
                     )

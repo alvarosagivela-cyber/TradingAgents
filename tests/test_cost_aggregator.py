@@ -245,6 +245,60 @@ class TestCostAggregator:
             assert result["over_threshold"] is True
             assert "Budget alert" in caplog.text
 
+    def test_burst_of_calls_within_an_hour_does_not_false_alarm(self, caplog):
+        """A short burst of calls (e.g. one paper-trading session run in a few
+        minutes) must NOT trigger over_threshold even if the naive linear
+        extrapolation would cross the budget threshold — regression for the gap
+        found in Phase 6 code review: the 1-hour floor on days_elapsed produces up
+        to a 365*24x multiplier, which can false-alarm on the very first session
+        before there's enough elapsed time to trust the annual trend.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cost_log_path = Path(tmpdir) / "cost.jsonl"
+
+            # All records within the same few minutes (well under 1 day elapsed).
+            # A single $0.10 call extrapolated via the 1-hour floor projects to
+            # 0.10 * 365 * 24 = $876/year -- comfortably over the $504 threshold --
+            # yet this is a burst, not a trend, so the alert must stay suppressed.
+            earliest_ts = "2026-08-09T12:00:00+00:00"
+            fixed_now = datetime(2026, 8, 9, 12, 5, 0, tzinfo=timezone.utc)
+
+            record = CostRecord(
+                timestamp=earliest_ts,
+                layer="research",
+                model="claude-haiku-4-5",
+                ticker="",
+                trade_date="",
+                input_tokens=1000,
+                output_tokens=500,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+                cost_usd=0.10,
+            )
+
+            with open(cost_log_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(record.to_json_dict()) + "\n")
+
+            config = {
+                "cost_log_path": str(cost_log_path),
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80,
+            }
+
+            with mock.patch("tradingagents.jobs.cost_aggregator.get_config", return_value=config):
+                with mock.patch("tradingagents.jobs.cost_aggregator.datetime") as mock_datetime:
+                    mock_datetime.now.return_value = fixed_now
+                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                    mock_datetime.timezone.utc = timezone.utc
+                    result = summarize_costs()
+
+            # The naive projection is still high (confirms the burst really would
+            # have crossed threshold without the gate) ...
+            assert result["projected_annual_usd"] > 504.0
+            # ... but the alert itself must be suppressed at this elapsed window.
+            assert result["over_threshold"] is False
+            assert "Budget alert" not in caplog.text
+
     def test_budget_alert_below_threshold(self, caplog):
         """Given projected annual spend well below 80% threshold, no warning logged."""
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -141,7 +141,7 @@ def read_cost_records(log_path: Path) -> list[CostRecord]:
                     data = json.loads(line)
                     record = CostRecord.from_json_dict(data)
                     records.append(record)
-                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError, AttributeError) as e:
                     logger.warning(
                         f"Failed to parse line {line_num} in {log_path.name}: {e}"
                     )

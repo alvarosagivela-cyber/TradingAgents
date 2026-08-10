@@ -148,8 +148,10 @@ class TradingAgentsGraph:
         Returns (deep_thinking_llm, quick_thinking_llm) both tagged with layer labels
         indicating they are reused across multiple node types:
         - deep_thinking_llm (layer="deep_thinking_shared"): used by Portfolio Manager only
-        - quick_thinking_llm (layer="quick_thinking_shared"): shared by 4 Analysts +
-          Momentum LLM node
+        - quick_thinking_llm (layer="quick_thinking_shared"): shared by 4 Analysts,
+          the Momentum LLM node, and this class's own Reflector/SignalProcessor helpers
+          (self.reflector, self.signal_processor below, both constructed from this
+          same quick_thinking_llm instance)
 
         The "_shared" suffix is documented and intentional — these instances back multiple
         node types, so per-node layer attribution is coarser than the fresh-per-call sites
