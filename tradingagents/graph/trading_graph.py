@@ -99,18 +99,7 @@ class TradingAgentsGraph:
         if self.callbacks:
             llm_kwargs["callbacks"] = self.callbacks
 
-        deep_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["deep_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-        quick_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["quick_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
+        deep_client, quick_client = self._create_llm_clients(llm_kwargs)
 
         self.deep_thinking_llm = deep_client.get_llm()
         self.quick_thinking_llm = quick_client.get_llm()
@@ -150,6 +139,45 @@ class TradingAgentsGraph:
         self.workflow = self.graph_setup.setup_graph(selected_analysts)
         self.graph = self.workflow.compile()
         self._checkpointer_ctx = None
+
+    def _create_llm_clients(
+        self, llm_kwargs: dict[str, Any]
+    ) -> tuple[BaseLLMClient, BaseLLMClient]:
+        """Extract and tag the shared graph-level LLM clients for cost tracking.
+
+        Returns (deep_thinking_llm, quick_thinking_llm) both tagged with layer labels
+        indicating they are reused across multiple node types:
+        - deep_thinking_llm (layer="deep_thinking_shared"): used by Portfolio Manager only
+        - quick_thinking_llm (layer="quick_thinking_shared"): shared by 4 Analysts +
+          Momentum LLM node
+
+        The "_shared" suffix is documented and intentional — these instances back multiple
+        node types, so per-node layer attribution is coarser than the fresh-per-call sites
+        in Auditor/Conservative/Balanced/Aggressive (which can tag precisely). Cost
+        tracking still captures total spend completely (no gap in coverage), but per-node
+        attribution is approximate for these two shared instances.
+
+        Args:
+            llm_kwargs: Provider-specific kwargs (temperature, reasoning_effort, effort, etc.)
+
+        Returns:
+            Tuple of (deep_client, quick_client) both BaseLLMClient instances.
+        """
+        deep_client = create_llm_client(
+            provider=self.config["llm_provider"],
+            model=self.config["deep_think_llm"],
+            base_url=self.config.get("backend_url"),
+            layer="deep_thinking_shared",
+            **llm_kwargs,
+        )
+        quick_client = create_llm_client(
+            provider=self.config["llm_provider"],
+            model=self.config["quick_think_llm"],
+            base_url=self.config.get("backend_url"),
+            layer="quick_thinking_shared",
+            **llm_kwargs,
+        )
+        return deep_client, quick_client
 
     def _get_provider_kwargs(self) -> dict[str, Any]:
         """Get provider-specific kwargs for LLM client creation."""
