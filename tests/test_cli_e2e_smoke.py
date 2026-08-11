@@ -4,11 +4,16 @@ This test validates SETUP-01 and SETUP-02:
 - SETUP-01: Fork runs locally end-to-end without errors, using Claude instead of OpenAI
 - SETUP-02: yfinance + Alpha Vantage fallback vendor chain works
 
-SQLite checkpointing (D-10) is NOT exercised here: it is wired into
-TradingAgentsGraph.propagate(), which the interactive `analyze` CLI command
-does not call (it streams the compiled graph directly). Checkpointing itself
-is verified by tests/test_checkpoint_resume.py against propagate()/get_checkpointer()
-directly — see that file, and the note inline below for details.
+SQLite checkpointing (D-01) IS exercised here: as of Phase 7, the interactive
+`analyze` CLI command calls TradingAgentsGraph.propagate() (which internally
+wraps the graph in a SqliteSaver when checkpoint_enabled is set). This test
+exercises the full end-to-end flow with checkpointing enabled. The mechanism
+itself is also verified independently by tests/test_checkpoint_resume.py against
+propagate()/get_checkpointer() directly — see that file for lower-level unit
+testing of the checkpoint layer.
+
+For a fast, non-smoke-gated proof that the CLI delegates to propagate() (without
+requiring a real Anthropic API key), see tests/test_cli_checkpoint_delegation.py.
 
 The test requires a real ANTHROPIC_API_KEY (lives-API test, marked @pytest.mark.smoke).
 When run without the key, the test is skipped cleanly.
@@ -130,23 +135,18 @@ class TestCliE2ESmoke(unittest.TestCase):
                 f"Log file {log_file} not created",
             )
 
-            # NOTE on D-10 (SQLite checkpointing): checkpointing is wired into
+            # NOTE on D-01 (SQLite checkpointing): checkpointing is wired into
             # TradingAgentsGraph.propagate() (recompiles the workflow with a
             # SqliteSaver when config["checkpoint_enabled"] is set — see
-            # tradingagents/graph/trading_graph.py:362-402). The interactive CLI's
-            # run_analysis() does NOT call propagate() — it streams the compiled
-            # graph directly (graph.graph.stream(...), no checkpointer attached),
-            # so no checkpoint DB is ever created via this `tradingagents analyze`
-            # code path. This is confirmed upstream fork behavior, not a bug
-            # introduced here: the fork's own tests/test_checkpoint_resume.py
-            # exercises checkpointing exclusively through propagate()/get_checkpointer(),
-            # never through cli.main.run_analysis(). That suite already passed in
-            # Task 1 (regression) and is the authoritative proof the mechanism works.
-            # Asserting a checkpoint file here would test a code path that
-            # structurally doesn't have one, and would require another full
-            # (costly) LLM run through propagate() to exercise correctly — better
-            # left to a later phase if the production runner needs propagate()-based
-            # resumability (relevant for Phase 7's continuous unattended runs).
+            # tradingagents/graph/trading_graph.py:393-433). As of Phase 7, the
+            # interactive CLI's run_analysis() now calls propagate() directly,
+            # enabling checkpoint-resume for both interactive runs and unattended
+            # production runners. This test exercises the full flow with checkpointing
+            # enabled (checkpoint_enabled=True in fake_cfg). The checkpoint layer
+            # itself is also verified independently by tests/test_checkpoint_resume.py
+            # against propagate()/get_checkpointer() directly, and the CLI's delegation
+            # to propagate() is proven by tests/test_cli_checkpoint_delegation.py
+            # (a fast, non-smoke-gated unit test that requires no real API key).
 
         finally:
             # Clean up temp directories
