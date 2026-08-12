@@ -97,7 +97,13 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
             )
 
         retorno_12_1 = (close_1m_ago - close_12m_ago) / close_12m_ago
-        retorno_12_1 = round(retorno_12_1, 6)  # 6 decimals as per D-07
+        # float() is required here: round() on a numpy.float64 (what pandas .iloc
+        # scalars actually are, despite the MomentumMetrics.retorno_12_1: float
+        # annotation) returns another numpy.float64, not a native Python float.
+        # An un-cast numpy.float64 flowing into graph state fails msgpack
+        # serialization at checkpoint time (SqliteSaver), which only surfaces on
+        # a real checkpointed run, not the mocked/dict-state unit tests.
+        retorno_12_1 = float(round(retorno_12_1, 6))  # 6 decimals as per D-07
 
         # Compute z-score from rolling 12-1 distribution (D-15)
         # Build rolling returns: shift(22) to skip month, shift(253) for 12-month lookback
@@ -121,7 +127,7 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
                 z_score = 0.0
             else:
                 z_score = (retorno_12_1 - mean) / std
-            z_score = round(z_score, 4)  # 4 decimals as per D-15
+            z_score = float(round(z_score, 4))  # 4 decimals as per D-15; see float() note above
 
         # Derive confidence level from z-score magnitude (D-15)
         confidence_level = derive_confidence_level(z_score)

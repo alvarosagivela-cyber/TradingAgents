@@ -98,6 +98,43 @@ class TestJegadeeshTitmanFormula:
 
 
 @pytest.mark.unit
+class TestNativeFloatTypes:
+    """Regression guard: retorno_12_1/z_score must be native Python float, not numpy.float64.
+
+    A live end-to-end run against real market data surfaced 'Type is not msgpack
+    serializable: numpy.float64' at checkpoint time. pandas .iloc scalars on a
+    float64 column are numpy.float64, and round() on a numpy.float64 returns
+    another numpy.float64 (not a native float) -- so the values silently stayed
+    numpy-typed all the way into graph state. This never failed the mocked unit
+    tests above because they only assert equality/magnitude, never exact type,
+    and it never failed integration tests because those don't checkpoint via
+    msgpack. Only a real checkpointed run against real data caught it.
+    """
+
+    def test_compute_momentum_returns_native_float_not_numpy(self):
+        """retorno_12_1 and z_score must be builtins.float so msgpack checkpointing works."""
+        close_prices = [100.0 + i * 0.5 for i in range(300)]
+        frame = _make_ohlcv_frame(close_prices)
+
+        with patch(
+            "tradingagents.agents.utils.momentum_calculator.load_ohlcv"
+        ) as mock_load:
+            mock_load.return_value = frame.copy()
+
+            result = compute_momentum("AAPL", "2020-11-01")
+
+            assert result.valid is True
+            assert type(result.retorno_12_1) is float, (
+                f"retorno_12_1 is {type(result.retorno_12_1)}, expected native float "
+                "(numpy.float64 is not msgpack-serializable at checkpoint time)"
+            )
+            assert type(result.z_score) is float, (
+                f"z_score is {type(result.z_score)}, expected native float "
+                "(numpy.float64 is not msgpack-serializable at checkpoint time)"
+            )
+
+
+@pytest.mark.unit
 class TestFailOpen:
     """Test that momentum calculation fails gracefully (fail-open) on data errors."""
 
