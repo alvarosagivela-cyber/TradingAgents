@@ -85,6 +85,54 @@ class TestRetryThenSkip(unittest.TestCase):
             assert mock_instance.propagate.call_count == 2
             assert mock_sleep.call_count == 1  # Not called before the final failure
 
+    def test_run_ticker_with_retry_recovers_from_graph_construction_failure(self):
+        """Test that a TradingAgentsGraph() constructor failure is retried, not fatal.
+
+        Proves a transient failure while building the graph (e.g. LLM client
+        init) is treated like a propagate() failure: retried once, and does
+        not escape run_ticker_with_retry() to abort the rest of the day.
+        """
+        mock_instance = mock.MagicMock()
+        mock_instance.propagate.return_value = (
+            {"final_trade_decision": "HOLD"},
+            "HOLD",
+        )
+
+        with mock.patch.object(
+            runner,
+            "TradingAgentsGraph",
+            side_effect=[RuntimeError("LLM client init failed"), mock_instance],
+        ) as mock_graph_class, mock.patch.object(runner.time, "sleep") as mock_sleep:
+            result = runner.run_ticker_with_retry(
+                "AAPL",
+                "2026-08-11",
+                {},
+                ["market"],
+            )
+
+            assert result is True
+            assert mock_graph_class.call_count == 2  # retried construction
+            assert mock_instance.propagate.call_count == 1
+            assert mock_sleep.call_count == 1
+
+    def test_run_ticker_with_retry_skips_when_graph_construction_always_fails(self):
+        """Test that a ticker is skipped, not fatal, if construction never succeeds."""
+        with mock.patch.object(
+            runner,
+            "TradingAgentsGraph",
+            side_effect=RuntimeError("LLM client init failed"),
+        ) as mock_graph_class, mock.patch.object(runner.time, "sleep") as mock_sleep:
+            result = runner.run_ticker_with_retry(
+                "XOM",
+                "2026-08-11",
+                {},
+                ["market"],
+            )
+
+            assert result is False
+            assert mock_graph_class.call_count == 2
+            assert mock_sleep.call_count == 1
+
 
 @pytest.mark.unit
 class TestMainDefaults(unittest.TestCase):

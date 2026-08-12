@@ -51,16 +51,16 @@ def _extract_equity(history: Union[object, dict]) -> list[float]:
     # Try dict access first (Union typing suggests dict is possible)
     if isinstance(history, dict):
         equity = history.get("equity")
-        if equity is not None:
-            return list(equity)
+    else:
+        # Try object attribute access
+        equity = getattr(history, "equity", None)
+
+    if equity is None:
         return []
 
-    # Try object attribute access
-    equity = getattr(history, "equity", None)
-    if equity is not None:
-        return list(equity)
-
-    return []
+    # A brand-new paper account can have None entries for days before funding.
+    # Drop them rather than let a downstream np.array(dtype=float) raise.
+    return [value for value in equity if value is not None]
 
 
 def compute_window_sharpe(

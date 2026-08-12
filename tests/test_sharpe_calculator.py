@@ -50,6 +50,19 @@ class TestExtractEquity:
         result = _extract_equity(history)
         assert result == []
 
+    def test_extract_equity_filters_none_entries(self):
+        """A brand-new paper account can report None equity for pre-funding days.
+
+        Alpaca's /v2/portfolio/history returns None for days before the account
+        was funded. These must be dropped so downstream np.array(dtype=float)
+        doesn't raise a TypeError.
+        """
+        history = Mock()
+        history.equity = [None, None, 100000, 100500, 101000]
+
+        result = _extract_equity(history)
+        assert result == [100000, 100500, 101000]
+
 
 class TestComputeWindowSharpe:
     """Test compute_window_sharpe calculation and edge cases."""
@@ -216,6 +229,26 @@ class TestComputeWindowSharpe:
         else:  # keyword args
             request = call_args[1].get("history_filter")
             assert isinstance(request, GetPortfolioHistoryRequest)
+
+    def test_compute_window_sharpe_handles_leading_none_equity(self):
+        """New paper account: leading None equity entries degrade to insufficient_data,
+        not a caught-exception 'calculation failed' result."""
+        mock_client = Mock()
+        mock_client.get_portfolio_history.return_value = Mock(
+            equity=[None, None, 100000],
+            timestamp=[1, 2, 3],
+        )
+
+        start_date = datetime(2026, 8, 1)
+        end_date = datetime(2026, 8, 3)
+
+        result = compute_window_sharpe(mock_client, start_date, end_date)
+
+        # Only one real equity point survives filtering -> insufficient data,
+        # not an exception-path "calculation failed" caveat.
+        assert result["insufficient_data"] is True
+        assert result["sharpe_ratio"] == 0.0
+        assert "failed" not in result["caveat"].lower()
 
     def test_overfitting_threshold_constant(self):
         """D-07: OVERFITTING_SHARPE_THRESHOLD is exactly 1.0."""

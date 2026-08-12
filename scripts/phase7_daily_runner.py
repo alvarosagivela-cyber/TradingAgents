@@ -16,6 +16,12 @@ cost_aggregator.summarize_costs()) to stdout, visible via Windows Task Scheduler
 run history — passive, always-fresh visibility with zero new command the user
 must remember to run.
 
+Persistent logging: Task Scheduler does not capture a launched process's stdout/
+stderr, and this script always exits 0 (D-08), so console output and exit code are
+not durable records for an unattended 4-6 week window. Every run also appends to
+a log file under DEFAULT_CONFIG["results_dir"] so per-ticker outcomes and budget
+status remain reviewable after the fact regardless of how the process was invoked.
+
 Explicit scope boundary: This script is invoked once per day by Task Scheduler.
 It does NOT itself register the scheduled task — see setup_phase7_scheduler.ps1
 for the one-time, human-run, documented setup artifact.
@@ -25,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import re
 import sys
 import time
@@ -35,10 +42,20 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.jobs.cost_aggregator import summarize_costs
 from tradingagents.trading.validation_universe import PHASE7_TICKER_BASKET
 
-# Configure logging
+# Persistent log file: Task Scheduler doesn't capture stdout/stderr and this
+# script always exits 0, so this file is the only durable record of daily
+# outcomes across the unattended validation window.
+_LOG_DIR = DEFAULT_CONFIG["results_dir"]
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_FILE = os.path.join(_LOG_DIR, "phase7_daily_runner.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(_LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -83,9 +100,13 @@ def run_ticker_with_retry(
     succeeds, return True immediately.
 
     D-01 dependency: checkpoint_enabled must be True in config. A single
-    TradingAgentsGraph instance is constructed once (not per attempt) — a
-    fresh checkpointed propagate() retry resumes from wherever the first
-    attempt's exception left the checkpoint, reusing D-01's resumability.
+    TradingAgentsGraph instance is constructed once it first succeeds (not
+    reconstructed per attempt) — a fresh checkpointed propagate() retry
+    resumes from wherever the first attempt's exception left the checkpoint,
+    reusing D-01's resumability. Construction itself happens inside the
+    retry loop too: a transient failure while building the graph (LLM client
+    init, memory log setup, etc.) is retried exactly like a propagate()
+    failure rather than escaping and aborting the rest of the day's tickers.
 
     Args:
         ticker: The ticker symbol (e.g., "AAPL")
@@ -96,10 +117,14 @@ def run_ticker_with_retry(
     Returns:
         True if either attempt succeeded, False if both attempts failed
     """
-    graph = TradingAgentsGraph(selected_analysts, config=config, debug=False)
+    graph = None
 
     for attempt in (1, 2):
         try:
+            if graph is None:
+                graph = TradingAgentsGraph(
+                    selected_analysts, config=config, debug=False
+                )
             final_state, signal = graph.propagate(
                 ticker, trade_date, asset_type="stock"
             )
