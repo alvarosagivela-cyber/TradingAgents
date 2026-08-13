@@ -76,3 +76,28 @@ def test_setup_script_documents_human_run():
         f"Setup script should document one-time, human-run execution. "
         f"Found only: {found_keywords}"
     )
+
+
+@pytest.mark.unit
+def test_setup_script_survives_missed_trigger():
+    """Test that the task settings let a missed trigger (PC off/asleep/on battery
+    at 16:05) catch up instead of silently dropping the whole day.
+
+    Without StartWhenAvailable, Task Scheduler's default is to skip a missed
+    trigger entirely -- not even a log entry, since phase7_daily_runner.py never
+    starts. D-08's retry-then-skip only guards failures inside a running process,
+    it does nothing if the process never launches.
+    """
+    script_path = pathlib.Path(__file__).parent.parent / "scripts" / "setup_phase7_scheduler.ps1"
+    content = script_path.read_text(encoding="utf-8")
+
+    required_elements = {
+        "New-ScheduledTaskSettingsSet": "settings object construction",
+        "-StartWhenAvailable": "catch up a missed trigger once the PC is back on",
+        "-AllowStartIfOnBatteries": "run on laptop battery power, not only plugged in",
+    }
+
+    for element, description in required_elements.items():
+        assert element in content, (
+            f"Required element '{element}' ({description}) not found in setup script"
+        )

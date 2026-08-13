@@ -44,7 +44,7 @@ if (-not (Test-Path $scriptPath)) {
 
 Write-Host ""
 Write-Host "Phase 7 Windows Task Scheduler Setup" -ForegroundColor Cyan
-Write-Host "=" * 80
+Write-Host ("=" * 80)
 Write-Host ""
 Write-Host "This script will register a daily scheduled task that runs the Phase 7"
 Write-Host "paper trading validation runner at $TriggerTime local time each day."
@@ -69,12 +69,23 @@ if ($null -eq $action) {
     exit 1
 }
 
+# Settings: this task must survive the machine being off/asleep/on-battery at the
+# trigger time -- D-08's retry-then-skip only guards failures *inside* a running
+# process, it does nothing if the process never launches. Without StartWhenAvailable,
+# a missed trigger (PC off at 16:05) silently drops the entire day with zero record,
+# not even a skip log entry, since phase7_daily_runner.py never starts.
+$settings = New-ScheduledTaskSettingsSet `
+    -StartWhenAvailable `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries
+
 # Register the scheduled task
 try {
     Register-ScheduledTask `
         -TaskName $TaskName `
         -Trigger $trigger `
         -Action $action `
+        -Settings $settings `
         -RunLevel Highest `
         -Description "Phase 7 paper trading validation daily runner (D-02)" `
         -Force
@@ -99,7 +110,7 @@ try {
 }
 
 Write-Host ""
-Write-Host "=" * 80
+Write-Host ("=" * 80)
 Write-Host ""
 Write-Host "To view the scheduled task:" -ForegroundColor Cyan
 Write-Host "  taskkill.exe /FI `"TASKNAME eq $TaskName`" /V"
