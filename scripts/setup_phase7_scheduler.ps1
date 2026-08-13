@@ -1,4 +1,4 @@
-# Phase 7 Windows Task Scheduler Setup Script
+﻿# Phase 7 Windows Task Scheduler Setup Script
 #
 # ONE-TIME, HUMAN-RUN setup artifact (D-02)
 #
@@ -7,7 +7,7 @@
 # by the user when they choose to start the 4-6 week paper trading validation window.
 #
 # IMPORTANT: This script is NOT invoked automatically by any other script in the repo.
-# It is a documented artifact only — the user runs it manually when ready to begin.
+# It is a documented artifact only -- the user runs it manually when ready to begin.
 #
 # Usage (PowerShell, as Administrator):
 #   .\setup_phase7_scheduler.ps1
@@ -78,7 +78,7 @@ try {
         -RunLevel Highest `
         -Description "Phase 7 paper trading validation daily runner (D-02)" `
         -Force
-    Write-Host "✓ Task registered successfully!" -ForegroundColor Green
+    Write-Host "[OK] Task registered successfully!" -ForegroundColor Green
 } catch {
     Write-Host "ERROR: Failed to register task" -ForegroundColor Red
     Write-Host $_.Exception.Message
