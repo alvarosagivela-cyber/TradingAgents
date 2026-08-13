@@ -87,14 +87,19 @@ class TestCostAggregator:
             ):
                 result = summarize_costs()
 
-            # Verify aggregation
-            assert result["total_cost_usd"] == 0.60
+            # Verify aggregation. Float sums use pytest.approx, not ==: CPython 3.12+
+            # uses compensated (Neumaier) summation for sum() of floats, which makes
+            # sum([0.10, 0.20, 0.30]) exactly 0.6; on 3.10/3.11 the same sum() call
+            # is naive chained addition and yields 0.6000000000000001. Both are
+            # correct IEEE-754 behavior for their respective CPython version -- the
+            # test must tolerate either, not assume one exact bit pattern.
+            assert result["total_cost_usd"] == pytest.approx(0.60)
             assert result["call_count"] == 3
-            assert result["by_layer"]["research"] == 0.10
-            assert result["by_layer"]["auditor"] == 0.20
-            assert result["by_layer"]["conservative"] == 0.30
-            assert result["by_model"]["claude-haiku-4-5"] == 0.40  # research + conservative
-            assert result["by_model"]["claude-sonnet-5"] == 0.20   # auditor
+            assert result["by_layer"]["research"] == pytest.approx(0.10)
+            assert result["by_layer"]["auditor"] == pytest.approx(0.20)
+            assert result["by_layer"]["conservative"] == pytest.approx(0.30)
+            assert result["by_model"]["claude-haiku-4-5"] == pytest.approx(0.40)  # research + conservative
+            assert result["by_model"]["claude-sonnet-5"] == pytest.approx(0.20)   # auditor
 
     def test_empty_cost_log(self):
         """Given empty cost log, summarize_costs() returns zeroed dict without error."""

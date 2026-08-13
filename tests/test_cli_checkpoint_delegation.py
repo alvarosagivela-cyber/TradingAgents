@@ -82,6 +82,15 @@ class TestCliCheckpointDelegation(unittest.TestCase):
                 "TRADINGAGENTS_CHECKPOINT_ENABLED": "true",
                 "TRADINGAGENTS_MAX_DEBATE_ROUNDS": "1",
                 "TRADINGAGENTS_MAX_RISK_ROUNDS": "1",
+                # Step 7 (Thinking Agents) in get_user_selections() only skips its
+                # interactive questionary prompt (select_shallow_thinking_agent) when
+                # one of these two env vars is set -- without it, run_analysis() hits
+                # a real .ask() call that raises EOFError on any stdin-less runner
+                # (GitHub Actions). Passed locally on Windows only because the local
+                # terminal's stdin isn't truly closed the same way; never actually
+                # exercised in real CI until this test's first real run (#1).
+                "TRADINGAGENTS_DEEP_THINK_LLM": "claude-sonnet-5",
+                "TRADINGAGENTS_QUICK_THINK_LLM": "claude-haiku-4-5",
             }, clear=False), \
             mock.patch.object(m, "DEFAULT_CONFIG", fake_cfg), \
             mock.patch.object(m, "fetch_announcements", return_value=None), \
@@ -201,6 +210,15 @@ class TestCliCheckpointDelegation(unittest.TestCase):
                 "TRADINGAGENTS_CHECKPOINT_ENABLED": "false",
                 "TRADINGAGENTS_MAX_DEBATE_ROUNDS": "1",
                 "TRADINGAGENTS_MAX_RISK_ROUNDS": "1",
+                # Step 7 (Thinking Agents) in get_user_selections() only skips its
+                # interactive questionary prompt (select_shallow_thinking_agent) when
+                # one of these two env vars is set -- without it, run_analysis() hits
+                # a real .ask() call that raises EOFError on any stdin-less runner
+                # (GitHub Actions). Passed locally on Windows only because the local
+                # terminal's stdin isn't truly closed the same way; never actually
+                # exercised in real CI until this test's first real run (#1).
+                "TRADINGAGENTS_DEEP_THINK_LLM": "claude-sonnet-5",
+                "TRADINGAGENTS_QUICK_THINK_LLM": "claude-haiku-4-5",
             }, clear=False), \
             mock.patch.object(m, "DEFAULT_CONFIG", fake_cfg), \
             mock.patch.object(m, "fetch_announcements", return_value=None), \
