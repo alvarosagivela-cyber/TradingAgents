@@ -81,7 +81,7 @@ def test_setup_script_documents_human_run():
 @pytest.mark.unit
 def test_setup_script_survives_missed_trigger():
     """Test that the task settings let a missed trigger (PC off/asleep/on battery
-    at 16:05) catch up instead of silently dropping the whole day.
+    at the trigger time) catch up instead of silently dropping the whole day.
 
     Without StartWhenAvailable, Task Scheduler's default is to skip a missed
     trigger entirely -- not even a log entry, since phase7_daily_runner.py never

@@ -20,9 +20,16 @@
 #   1: Script was not run as Administrator
 #
 
+# Default trigger time assumes a Europe/Madrid (Romance Standard Time) machine
+# clock, confirmed via Get-TimeZone. US market close (16:00 ET) lands at ~22:00
+# Madrid time in summer (CEST, UTC+2) and ~21:00 in winter (CET, UTC+1) -- 22:30
+# gives a safety margin after close either way. The original 16:05 default was
+# wrong: that's ~10:05 ET, mid-session, not after close, despite the comment
+# below originally claiming otherwise -- caught before the scheduler's first
+# real trigger fired (all prior verification runs were manual/on-demand).
 param(
     [string]$PythonExe = "python",
-    [string]$TriggerTime = "16:05",
+    [string]$TriggerTime = "22:30",
     [string]$TaskName = "Phase7-DailyValidation"
 )
 
@@ -72,7 +79,7 @@ if ($null -eq $action) {
 # Settings: this task must survive the machine being off/asleep/on-battery at the
 # trigger time -- D-08's retry-then-skip only guards failures *inside* a running
 # process, it does nothing if the process never launches. Without StartWhenAvailable,
-# a missed trigger (PC off at 16:05) silently drops the entire day with zero record,
+# a missed trigger (PC off at the trigger time) silently drops the entire day with zero record,
 # not even a skip log entry, since phase7_daily_runner.py never starts.
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
