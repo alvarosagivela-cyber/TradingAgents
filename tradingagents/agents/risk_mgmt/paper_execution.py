@@ -83,7 +83,13 @@ def create_paper_execution_node():
         """
         ticker = state.get("company_of_interest", "")
         proposed_side = state.get("proposed_side", "Hold")
-        notional = state.get("proposed_notional_usd", 0.0)
+        # Alpaca rejects notional values with more than 2 decimal places ("notional
+        # value must be limited to 2 decimal places", code 42210000) -- confirmed
+        # live in production against a real BTC/USD Sell order, whose unrounded
+        # notional (risk_position_size_pct * portfolio_total_value, a real Alpaca
+        # equity float) had more precision than that. round() must happen before
+        # the order is built, not just at display/log time.
+        notional = round(state.get("proposed_notional_usd", 0.0), 2)
         execution_log = state.get("execution_log", [])
 
         # If no action proposed, skip submission

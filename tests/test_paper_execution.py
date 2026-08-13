@@ -130,6 +130,41 @@ class TestPaperExecution:
         assert result["paper_order_id"] == ""
         assert "order submission failed" in result["execution_log"][0]
 
+    def test_notional_rounded_to_two_decimal_places(self):
+        """Alpaca rejects notional values with more than 2 decimal places
+        ("notional value must be limited to 2 decimal places", code 42210000) --
+        confirmed live in production against a real BTC/USD Sell order, whose
+        unrounded notional (2% of a real, non-round Alpaca account equity float)
+        had more precision than that and was rejected outright.
+        """
+        state = {
+            "company_of_interest": "BTC-USD",
+            "proposed_side": "Sell",
+            "proposed_notional_usd": 99.999462837,
+            "execution_log": [],
+            "messages": [],
+        }
+
+        mock_order = MagicMock()
+        mock_order.id = "order-456"
+        mock_client = MagicMock()
+        mock_client.submit_order.return_value = mock_order
+
+        with patch(
+            "tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client",
+            return_value=mock_client,
+        ), patch(
+            "tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest"
+        ) as mock_request_class:
+            mock_request_class.return_value = MagicMock()
+
+            node = create_paper_execution_node()
+            result = node(state)
+
+        assert result["paper_execution_status"] == "submitted"
+        _, kwargs = mock_request_class.call_args
+        assert kwargs["notional"] == 100.0
+
     def test_notional_not_qty_in_order_request(self):
         """MarketOrderRequest should use notional=, never qty=."""
         state = {
