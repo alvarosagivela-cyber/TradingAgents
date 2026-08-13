@@ -10,7 +10,11 @@ Tests enforce that:
 
 from unittest.mock import MagicMock, patch, call
 import pytest
-from tradingagents.agents.risk_mgmt.paper_execution import create_paper_execution_node
+from alpaca.trading.enums import TimeInForce
+from tradingagents.agents.risk_mgmt.paper_execution import (
+    create_paper_execution_node,
+    _to_alpaca_symbol,
+)
 
 
 @pytest.mark.unit
@@ -162,3 +166,91 @@ class TestPaperExecution:
                             # Verify the call includes notional (this test confirms the structure)
 
         assert result["paper_execution_status"] == "submitted"
+
+
+@pytest.mark.unit
+class TestSymbolTranslation:
+    """_to_alpaca_symbol translates yfinance-style crypto tickers to Alpaca's slash format."""
+
+    def test_crypto_ticker_translated_to_slash_format(self):
+        assert _to_alpaca_symbol("BTC-USD") == "BTC/USD"
+
+    def test_equity_ticker_passes_through_unchanged(self):
+        assert _to_alpaca_symbol("AAPL") == "AAPL"
+
+    def test_etf_ticker_passes_through_unchanged(self):
+        """GLD/SLV are gold/silver ETF proxies, not crypto -- must not be translated."""
+        assert _to_alpaca_symbol("GLD") == "GLD"
+        assert _to_alpaca_symbol("SLV") == "SLV"
+
+
+@pytest.mark.unit
+class TestCryptoOrderSubmission:
+    """Crypto orders (D-04 basket's BTC-USD) must use Alpaca's symbol format and TIF.
+
+    Alpaca's crypto trading API only accepts gtc/ioc time_in_force -- day is rejected
+    outright (confirmed against Alpaca's docs). These tests use the real TimeInForce
+    enum (not mocked) so the exact value submitted can be asserted, not just that
+    *a* TimeInForce attribute was accessed.
+    """
+
+    def test_crypto_buy_uses_slash_symbol_and_gtc(self):
+        state = {
+            "company_of_interest": "BTC-USD",
+            "proposed_side": "Buy",
+            "proposed_notional_usd": 100.0,
+            "execution_log": [],
+            "messages": [],
+        }
+
+        mock_order = MagicMock()
+        mock_order.id = "crypto-order-1"
+        mock_client = MagicMock()
+        mock_client.submit_order.return_value = mock_order
+
+        with patch(
+            "tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client",
+            return_value=mock_client,
+        ), patch(
+            "tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest"
+        ) as mock_request_class:
+            mock_request_class.return_value = MagicMock()
+
+            node = create_paper_execution_node()
+            result = node(state)
+
+        assert result["paper_execution_status"] == "submitted"
+        _, kwargs = mock_request_class.call_args
+        assert kwargs["symbol"] == "BTC/USD"
+        assert kwargs["time_in_force"] == TimeInForce.GTC
+
+    def test_equity_buy_still_uses_day(self):
+        """Regression: equity orders must keep using DAY, not silently switch to GTC."""
+        state = {
+            "company_of_interest": "AAPL",
+            "proposed_side": "Buy",
+            "proposed_notional_usd": 2000.0,
+            "execution_log": [],
+            "messages": [],
+        }
+
+        mock_order = MagicMock()
+        mock_order.id = "equity-order-1"
+        mock_client = MagicMock()
+        mock_client.submit_order.return_value = mock_order
+
+        with patch(
+            "tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client",
+            return_value=mock_client,
+        ), patch(
+            "tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest"
+        ) as mock_request_class:
+            mock_request_class.return_value = MagicMock()
+
+            node = create_paper_execution_node()
+            result = node(state)
+
+        assert result["paper_execution_status"] == "submitted"
+        _, kwargs = mock_request_class.call_args
+        assert kwargs["symbol"] == "AAPL"
+        assert kwargs["time_in_force"] == TimeInForce.DAY

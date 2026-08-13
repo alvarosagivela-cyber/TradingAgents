@@ -4,6 +4,16 @@ This module computes the 12-month buy-and-hold return (skipping the most recent 
 and derives z-score confidence metrics for research theses. All calculations are pure
 Python, deterministic (bit-identical across runs with identical input), and designed
 to produce reliable, reproducible values that can be validated post-LLM.
+
+Window units differ by asset class, both aiming at the same "12 months, skip the
+most recent month" semantic:
+- Equities/ETFs trade ~252 days/year (weekends and holidays closed), so the window
+  is expressed in trading-day row counts (252/21).
+- Crypto trades every calendar day (confirmed empirically: yfinance returns one bar
+  per calendar day, weekends included), so 252 row-based "trading days" would only
+  span ~8.3 calendar months, not 12. The window is instead expressed directly in
+  calendar days (365/30), which for a 24/7 asset's gap-free daily series is the
+  same as a row count.
 """
 
 from __future__ import annotations
@@ -14,9 +24,19 @@ from typing import NamedTuple
 import pandas as pd
 
 from tradingagents.dataflows.stockstats_utils import load_ohlcv
-from tradingagents.dataflows.symbol_utils import NoMarketDataError
+from tradingagents.dataflows.symbol_utils import NoMarketDataError, crypto_base
 
 logger = logging.getLogger(__name__)
+
+# Equities/ETFs: trading-day row counts (~252 trading days/year).
+EQUITY_LOOKBACK_DAYS = 252
+EQUITY_SKIP_DAYS = 21
+EQUITY_MIN_HISTORY = EQUITY_LOOKBACK_DAYS + EQUITY_SKIP_DAYS + 1  # 274
+
+# Crypto: calendar-day row counts (~365 calendar days/year, 24/7 trading).
+CRYPTO_LOOKBACK_DAYS = 365
+CRYPTO_SKIP_DAYS = 30
+CRYPTO_MIN_HISTORY = CRYPTO_LOOKBACK_DAYS + CRYPTO_SKIP_DAYS + 1  # 396
 
 
 class MomentumMetrics(NamedTuple):
@@ -42,8 +62,10 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
 
     Implements the skip-month momentum formula exactly (D-07):
     - Fetch 5-year OHLCV ending at as_of_date
-    - Skip the most recent 21 trading days (~ 1 month)
-    - Calculate return from 252 days ago (~ 12 months) to 21 days ago
+    - Skip the most recent month (21 trading days for equities, 30 calendar days
+      for 24/7 crypto -- see module docstring)
+    - Calculate return from ~12 months ago (252 trading days / 365 calendar days)
+      to skip_days ago
     - Derive z-score from rolling 12-1 distribution over the full 5-year window
 
     Fail-open on any data fetch error: returns valid=False, retorno_12_1=0.0.
@@ -56,15 +78,21 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
         MomentumMetrics with retorno_12_1, z_score, confidence_level, and valid flag
     """
     try:
+        is_crypto = crypto_base(ticker) is not None
+        lookback_days = CRYPTO_LOOKBACK_DAYS if is_crypto else EQUITY_LOOKBACK_DAYS
+        skip_days = CRYPTO_SKIP_DAYS if is_crypto else EQUITY_SKIP_DAYS
+        min_history = CRYPTO_MIN_HISTORY if is_crypto else EQUITY_MIN_HISTORY
+
         # Load OHLCV data (5-year lookback, already cleaned and ascending-by-Date)
         data = load_ohlcv(ticker, as_of_date)
 
-        # Ensure enough history: need 252 days for 12-month leg + 22 for skip month
-        # (252 + 22 = 274; we need n >= 274 to have indices 0 through 273 available)
+        # Ensure enough history: need lookback_days for the 12-month leg + (skip_days + 1)
+        # for the skip month (e.g. equities: 252 + 22 = 274 rows needed)
         n = len(data)
-        if n < 274:
+        if n < min_history:
             logger.warning(
-                f"Insufficient OHLCV history for {ticker}: {n} rows < 274 required (12-1 skip-month formula)"
+                f"Insufficient OHLCV history for {ticker}: {n} rows < {min_history} required "
+                f"(12-1 skip-month formula, {'crypto/calendar-day' if is_crypto else 'equity/trading-day'} window)"
             )
             return MomentumMetrics(
                 retorno_12_1=0.0,
@@ -77,11 +105,11 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
         # Compute retorno_12_1 (Jegadeesh-Titman skip-month formula)
         # Data is sorted ascending by Date, so:
         # - Most recent: data.iloc[-1] (index n-1)
-        # - 21 days ago: data.iloc[-22] (index n-1-21 = n-22)
-        # - 252 days ago: data.iloc[-253] (index n-1-252 = n-253)
+        # - skip_days ago: data.iloc[-(skip_days+1)]
+        # - lookback_days ago: data.iloc[-(lookback_days+1)]
         # Return = (close_1m_ago - close_12m_ago) / close_12m_ago
-        idx_1m = n - 22  # 21 trading days ago (0-indexed)
-        idx_12m = n - 253  # 252 trading days ago (0-indexed)
+        idx_1m = n - (skip_days + 1)
+        idx_12m = n - (lookback_days + 1)
 
         close_1m_ago = data["Close"].iloc[idx_1m]
         close_12m_ago = data["Close"].iloc[idx_12m]
@@ -106,11 +134,11 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
         retorno_12_1 = float(round(retorno_12_1, 6))  # 6 decimals as per D-07
 
         # Compute z-score from rolling 12-1 distribution (D-15)
-        # Build rolling returns: shift(22) to skip month, shift(253) for 12-month lookback
-        # This matches the formula: (price_21d_ago - price_252d_ago) / price_252d_ago
+        # Build rolling returns: shift(skip_days+1) to skip month, shift(lookback_days+1)
+        # for the 12-month lookback. This matches the idx_1m/idx_12m formula above.
         rolling = (
-            (data["Close"].shift(22) - data["Close"].shift(253))
-            / data["Close"].shift(253)
+            (data["Close"].shift(skip_days + 1) - data["Close"].shift(lookback_days + 1))
+            / data["Close"].shift(lookback_days + 1)
         )
         rolling = rolling.dropna()
 

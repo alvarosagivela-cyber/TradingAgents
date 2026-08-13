@@ -135,6 +135,74 @@ class TestNativeFloatTypes:
 
 
 @pytest.mark.unit
+class TestCryptoCalendarDayWindow:
+    """Crypto tickers (BTC-USD) use calendar-day windows (365/30), not trading-day
+    windows (252/21) -- crypto trades every day of the week, confirmed empirically
+    against yfinance (BTC-USD returns one bar per calendar day, weekends included).
+    Reusing the equity row-count constants for crypto would only span ~8.3 calendar
+    months for the "12-month" leg, not 12.
+    """
+
+    def test_crypto_ticker_requires_396_rows_not_274(self):
+        """A crypto ticker with 274-394 rows is equity-sufficient but crypto-insufficient."""
+        # 350 rows: enough for equities (>=274) but not for crypto (<396)
+        close_prices = [100.0 + i * 0.1 for i in range(350)]
+        frame = _make_ohlcv_frame(close_prices)
+
+        with patch(
+            "tradingagents.agents.utils.momentum_calculator.load_ohlcv"
+        ) as mock_load:
+            mock_load.return_value = frame.copy()
+
+            equity_result = compute_momentum("AAPL", "2020-11-01")
+            crypto_result = compute_momentum("BTC-USD", "2020-11-01")
+
+        assert equity_result.valid is True, "350 rows should be sufficient for an equity"
+        assert crypto_result.valid is False, "350 rows should be insufficient for crypto (needs 396)"
+
+    def test_crypto_ticker_uses_365_30_day_offsets(self):
+        """For BTC-USD, retorno_12_1 is computed from rows 365/30 days back, not 252/21."""
+        # Flat prices except a spike in the most recent 30 rows (the crypto skip window).
+        # With crypto's 30-day skip, the spike should be excluded (return ~0).
+        # With equity's 21-day skip, rows 22-30 back would leak the spike into the
+        # "1 month ago" price, giving a different (wrong) result for this ticker.
+        base_price = 100.0
+        prices = [base_price] * (400 - 30) + [base_price * 3.0] * 30
+        frame = _make_ohlcv_frame(prices)
+
+        with patch(
+            "tradingagents.agents.utils.momentum_calculator.load_ohlcv"
+        ) as mock_load:
+            mock_load.return_value = frame
+
+            result = compute_momentum("BTC-USD", "2020-11-01")
+
+        assert result.valid is True
+        # Flat before the spike, spike fully skipped by the 30-day crypto window ->
+        # retorno_12_1 should be ~0, not ~2.0 (which would mean the spike leaked in).
+        assert abs(result.retorno_12_1) < 0.01
+
+    def test_gld_slv_are_not_treated_as_crypto(self):
+        """Gold/silver ETF proxies (GLD, SLV) must use equity trading-day windows,
+        not crypto calendar-day windows -- they trade on NYSE Arca during market
+        hours like any other ETF, not 24/7."""
+        # 300 rows: sufficient for equity (>=274), insufficient for crypto (<396)
+        close_prices = [100.0 + i * 0.1 for i in range(300)]
+        frame = _make_ohlcv_frame(close_prices)
+
+        with patch(
+            "tradingagents.agents.utils.momentum_calculator.load_ohlcv"
+        ) as mock_load:
+            mock_load.return_value = frame.copy()
+
+            gld_result = compute_momentum("GLD", "2020-11-01")
+            slv_result = compute_momentum("SLV", "2020-11-01")
+
+        assert gld_result.valid is True, "GLD should use the equity (274-row) threshold, not crypto's 396"
+        assert slv_result.valid is True, "SLV should use the equity (274-row) threshold, not crypto's 396"
+
+
+@pytest.mark.unit
 class TestFailOpen:
     """Test that momentum calculation fails gracefully (fail-open) on data errors."""
 

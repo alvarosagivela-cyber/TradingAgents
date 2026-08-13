@@ -8,6 +8,14 @@ The node uses notional sizing (not share quantity) to avoid introducing a live-p
 dependency in this phase — the Portfolio Manager and Risk Squad have already pre-computed
 the dollar sizing in proposed_notional_usd (D-03).
 
+Crypto tickers (e.g. BTC-USD, the yfinance/data-pipeline convention) are translated to
+Alpaca's slash symbol format (BTC/USD) at this execution boundary only -- every other
+part of the pipeline (data fetch, momentum calc, reports) keeps using the yfinance form.
+Alpaca's crypto trading API only accepts `gtc`/`ioc` time_in_force (confirmed against
+Alpaca's docs: "For Crypto Trading, Alpaca only supports gtc and ioc. OPG, fok, day, and
+CLS are not supported") -- submitting `day` for a crypto order is rejected outright, so
+this node picks the TIF deterministically from the ticker string, never from an LLM.
+
 On any Alpaca submission error (network, API, auth), the node catches the exception and
 returns paper_execution_status='failed' without propagating, to prevent a single Alpaca
 error from crashing the entire graph.
@@ -18,9 +26,19 @@ import logging
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
 
+from tradingagents.dataflows.symbol_utils import crypto_base
 from tradingagents.trading.alpaca_client import create_alpaca_client
 
 logger = logging.getLogger(__name__)
+
+
+def _to_alpaca_symbol(ticker: str) -> str:
+    """Translate a yfinance-style crypto ticker (BASE-USD) to Alpaca's BASE/USD.
+
+    Non-crypto tickers (equities, ETFs) pass through unchanged.
+    """
+    base = crypto_base(ticker)
+    return f"{base}/USD" if base else ticker
 
 
 def create_paper_execution_node():
@@ -48,10 +66,12 @@ def create_paper_execution_node():
         If proposed_side in ('Buy', 'Sell'):
         - Creates an Alpaca client (paper=True enforced at factory level)
         - Submits a MarketOrderRequest with:
-          - symbol=ticker
+          - symbol=ticker translated to Alpaca's crypto format (BASE/USD) when the
+            ticker is a recognized crypto base; equities/ETFs pass through unchanged
           - notional=proposed_notional_usd (dollar-based, not share quantity)
           - side=OrderSide.BUY or OrderSide.SELL
-          - time_in_force=TimeInForce.DAY
+          - time_in_force=TimeInForce.GTC for crypto (Alpaca rejects DAY for crypto),
+            TimeInForce.DAY for equities/ETFs
         - On success: paper_execution_status='submitted', paper_order_id=order.id
         - On Alpaca exception: paper_execution_status='failed', paper_order_id='', exception logged
 
@@ -80,16 +100,22 @@ def create_paper_execution_node():
         # Convert proposed_side to Alpaca OrderSide
         order_side = OrderSide.BUY if proposed_side == "Buy" else OrderSide.SELL
 
+        # Crypto trades 24/7 and Alpaca's crypto API only accepts gtc/ioc (day is
+        # rejected outright); equities close daily and use day, matching prior behavior.
+        alpaca_symbol = _to_alpaca_symbol(ticker)
+        is_crypto = crypto_base(ticker) is not None
+        time_in_force = TimeInForce.GTC if is_crypto else TimeInForce.DAY
+
         try:
             # Create Alpaca client (paper=True hardcoded at factory level)
             client = create_alpaca_client(paper=True)
 
             # Build notional order (dollar-based, no live price fetch needed)
             order_request = MarketOrderRequest(
-                symbol=ticker,
+                symbol=alpaca_symbol,
                 notional=notional,
                 side=order_side,
-                time_in_force=TimeInForce.DAY,
+                time_in_force=time_in_force,
             )
 
             # Submit order to Alpaca paper trading
@@ -103,7 +129,7 @@ def create_paper_execution_node():
                 "execution_log": execution_log
                 + [
                     f"Paper Execution: order {order_id} submitted "
-                    f"({proposed_side} ${notional:.2f} notional {ticker}) to Alpaca paper trading"
+                    f"({proposed_side} ${notional:.2f} notional {alpaca_symbol}) to Alpaca paper trading"
                 ],
             }
 

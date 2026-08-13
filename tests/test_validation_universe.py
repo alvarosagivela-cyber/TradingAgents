@@ -1,7 +1,8 @@
 """Unit tests for validation_universe module (D-03/D-04: fixed ticker basket, no discovery).
 
 Tests verify:
-- D-03: Fixed, sector-varied 10-ticker basket for Phase 7 window
+- D-03: Fixed, sector-varied 13-instrument basket for Phase 7 window (10 equities
+  across 10 GICS sectors + gold/silver ETF proxies + BTC-USD)
 - D-04: Zero market-scanning, news-scanning, or LLM-driven ticker-selection logic
 """
 
@@ -9,17 +10,18 @@ import re
 from tradingagents.trading.validation_universe import PHASE7_TICKER_BASKET
 
 
-def test_basket_has_ten_sector_varied_tickers():
-    """D-03: PHASE7_TICKER_BASKET has exactly 10 unique uppercase string tickers.
+def test_basket_has_thirteen_instruments():
+    """D-03: PHASE7_TICKER_BASKET has exactly 13 unique uppercase string tickers.
 
-    Includes all 4 originals (AAPL, XOM, JPM, ETSY) and 6 additional sector-varied tickers.
+    Includes all 4 originals (AAPL, XOM, JPM, ETSY), 6 additional sector-varied
+    tickers, and 3 non-equity instruments (GLD, SLV, BTC-USD).
     """
-    # Exactly 10 tickers
-    assert len(PHASE7_TICKER_BASKET) == 10, \
-        f"Expected 10 tickers, got {len(PHASE7_TICKER_BASKET)}"
+    # Exactly 13 tickers
+    assert len(PHASE7_TICKER_BASKET) == 13, \
+        f"Expected 13 tickers, got {len(PHASE7_TICKER_BASKET)}"
 
     # All unique (no duplicates)
-    assert len(set(PHASE7_TICKER_BASKET)) == 10, \
+    assert len(set(PHASE7_TICKER_BASKET)) == 13, \
         f"Duplicate tickers found: {PHASE7_TICKER_BASKET}"
 
     # All uppercase strings
@@ -27,10 +29,15 @@ def test_basket_has_ten_sector_varied_tickers():
         assert isinstance(ticker, str), f"Ticker {ticker} is not a string"
         assert ticker.isupper(), f"Ticker {ticker} is not uppercase"
 
-    # Includes the 4 originals
+    # Includes the 4 original equities
     required_originals = {"AAPL", "XOM", "JPM", "ETSY"}
     assert required_originals.issubset(set(PHASE7_TICKER_BASKET)), \
         f"Missing original tickers. Required: {required_originals}, Got: {set(PHASE7_TICKER_BASKET)}"
+
+    # Includes the 3 non-equity instruments
+    required_non_equity = {"GLD", "SLV", "BTC-USD"}
+    assert required_non_equity.issubset(set(PHASE7_TICKER_BASKET)), \
+        f"Missing non-equity instruments. Required: {required_non_equity}, Got: {set(PHASE7_TICKER_BASKET)}"
 
 
 def test_basket_module_has_no_discovery_logic():
