@@ -1,0 +1,93 @@
+# Phase 7 daily paper trading runner, cloud-hosted (GitHub Actions).
+#
+# Runs tradingagents/scripts/phase7_daily_runner.py on a schedule so the 4-6 week
+# validation window doesn't depend on a specific machine being powered on --
+# added when the user needed to travel ~10 days without their PC, on top of the
+# original Windows Task Scheduler mechanism (D-02 in 07-CONTEXT.md). Only ONE
+# of the two trigger mechanisms (this workflow, or the local
+# scripts/setup_phase7_scheduler.ps1 task) should be active at a time: running
+# both would double-submit real paper trades and double-count Auditor verdicts
+# for the same ticker/day, corrupting the VALID-01 refutation metric.
+#
+# State persistence: the daily runner's audit trail (Research theses, Auditor
+# verdicts, Risk decisions, LLM cost records) normally lands under
+# ~/.tradingagents/ on whatever machine runs it -- meaningless on GitHub's
+# ephemeral runners, which start from a fresh checkout every run. Every path is
+# individually overridable via env vars (tradingagents/default_config.py), so
+# this workflow redirects them all into phase7-state/ inside the checked-out
+# repo, then commits and pushes that directory back after each run. This makes
+# every day's decision auditable in git history, and survives runner rotation.
+#
+# Trigger time: 22:30 Europe/Madrid (see scripts/setup_phase7_scheduler.ps1 for
+# the full reasoning -- US market close at 16:00 ET is ~22:00 Madrid time in
+# summer/CEST, ~21:00 in winter/CET; 22:30 gives a safety margin after close
+# either way). Cron is always UTC and does NOT auto-adjust for DST: 20:30 UTC =
+# 22:30 CEST now (August); once Spain switches back to CET (~early November),
+# this will fire at 21:30 local instead of 22:30 -- still safely after close,
+# just an hour earlier than intended. Revisit if the window runs that long.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions),
+# set by the user -- never by an agent, and never committed to the repo:
+#   ANTHROPIC_API_KEY
+#   ALPACA_PAPER_API_KEY
+#   ALPACA_PAPER_SECRET_KEY
+
+name: Phase 7 Cloud Daily Runner
+
+on:
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: phase7-cloud-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  daily-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run Phase 7 daily basket
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ALPACA_PAPER_API_KEY: ${{ secrets.ALPACA_PAPER_API_KEY }}
+          ALPACA_PAPER_SECRET_KEY: ${{ secrets.ALPACA_PAPER_SECRET_KEY }}
+          TRADINGAGENTS_LLM_PROVIDER: anthropic
+          TRADINGAGENTS_DEEP_THINK_LLM: claude-sonnet-5
+          TRADINGAGENTS_QUICK_THINK_LLM: claude-haiku-4-5
+          TRADINGAGENTS_RESULTS_DIR: ${{ github.workspace }}/phase7-state/logs
+          TRADINGAGENTS_CACHE_DIR: ${{ github.workspace }}/phase7-state/cache
+          TRADINGAGENTS_RESEARCH_LOG_PATH: ${{ github.workspace }}/phase7-state/research/theses.jsonl
+          TRADINGAGENTS_AUDITOR_LOG_PATH: ${{ github.workspace }}/phase7-state/auditor/audits.jsonl
+          TRADINGAGENTS_RISK_LOG_PATH: ${{ github.workspace }}/phase7-state/risk/decisions.jsonl
+          TRADINGAGENTS_COST_LOG_PATH: ${{ github.workspace }}/phase7-state/cost/llm_calls.jsonl
+        run: python scripts/phase7_daily_runner.py
+
+      - name: Commit updated audit trail
+        run: |
+          git config user.name "phase7-cloud-runner"
+          git config user.email "phase7-cloud-runner@users.noreply.github.com"
+          git add phase7-state/
+          if git diff --cached --quiet; then
+            echo "No state changes to commit"
+          else
+            git commit -m "chore(phase7): cloud daily run $(date -u +%Y-%m-%d)"
+            git push
+          fi
