@@ -45,11 +45,8 @@ def close_all_open_positions(client: TradingClient) -> dict[str, Any]:
         responses = client.close_all_positions(cancel_orders=True)
 
         # Alpaca SDK returns Union[list, dict] — extract count only from list
-        if isinstance(responses, list):
-            positions_closed = len(responses)
-        else:
-            # Dict response — count not extractable (documented, not a bug)
-            positions_closed = 0
+        # (dict response — count not extractable, documented, not a bug)
+        positions_closed = len(responses) if isinstance(responses, list) else 0
 
         logger.info("D-09: closed %d position(s), cancelled pending orders", positions_closed)
 

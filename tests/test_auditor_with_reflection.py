@@ -8,7 +8,6 @@ import pytest
 from tradingagents.agents.auditors.momentum_auditor import create_auditor_llm_node
 from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
 
-
 # ---------------------------------------------------------------------------
 # Test Reflection Injection When Present
 # ---------------------------------------------------------------------------
@@ -45,41 +44,42 @@ def test_reflection_injected_when_present():
 
     mock_llm.invoke = capture_prompt
 
-    # Mock bind_structured to return our mock LLM
-    with patch(
-        "tradingagents.agents.auditors.momentum_auditor.bind_structured",
-        return_value=mock_llm,
-    ):
-        # Mock create_llm_client to avoid actual LLM creation
-        with patch(
+    # Mock bind_structured to return our mock LLM, create_llm_client to avoid
+    # actual LLM creation, and read_reflection_for_ticker to return the fixture
+    with (
+        patch(
+            "tradingagents.agents.auditors.momentum_auditor.bind_structured",
+            return_value=mock_llm,
+        ),
+        patch(
             "tradingagents.agents.auditors.momentum_auditor.create_llm_client",
-        ):
-            # Mock read_reflection_for_ticker to return the fixture
-            with patch(
-                "tradingagents.agents.auditors.momentum_auditor.read_reflection_for_ticker",
-                return_value=reflection,
-            ) as mock_read:
-                # Create the LLM node and invoke it
-                llm_node = create_auditor_llm_node("claude-sonnet-5")
+        ),
+        patch(
+            "tradingagents.agents.auditors.momentum_auditor.read_reflection_for_ticker",
+            return_value=reflection,
+        ) as mock_read,
+    ):
+        # Create the LLM node and invoke it
+        llm_node = create_auditor_llm_node("claude-sonnet-5")
 
-                state = {
-                    "company_of_interest": "AAPL",
-                    "auditor_phase1_status": "pass",
-                    "auditor_retorno_12_1": 0.1,
-                    "auditor_z_score": 2.0,
-                    "thesis_verdict": "Buy",
-                }
+        state = {
+            "company_of_interest": "AAPL",
+            "auditor_phase1_status": "pass",
+            "auditor_retorno_12_1": 0.1,
+            "auditor_z_score": 2.0,
+            "thesis_verdict": "Buy",
+        }
 
-                result = llm_node(state)
+        llm_node(state)
 
-                # Verify read_reflection_for_ticker was called with "auditor" layer
-                mock_read.assert_called_once_with("auditor", "AAPL")
+        # Verify read_reflection_for_ticker was called with "auditor" layer
+        mock_read.assert_called_once_with("auditor", "AAPL")
 
-                # Verify the prompt contains the reflection content
-                assert captured_prompt is not None
-                assert "2026-07-15" in captured_prompt
-                assert "Sell" in captured_prompt
-                assert "Prior auditor analysis revealed weakness" in captured_prompt
+        # Verify the prompt contains the reflection content
+        assert captured_prompt is not None
+        assert "2026-07-15" in captured_prompt
+        assert "Sell" in captured_prompt
+        assert "Prior auditor analysis revealed weakness" in captured_prompt
 
 
 # ---------------------------------------------------------------------------
@@ -106,35 +106,37 @@ def test_no_reflection_injection_when_none():
 
     mock_llm.invoke = capture_prompt
 
-    with patch(
-        "tradingagents.agents.auditors.momentum_auditor.bind_structured",
-        return_value=mock_llm,
-    ):
-        # Mock create_llm_client to avoid actual LLM creation
-        with patch(
+    # Mock bind_structured to return our mock LLM, create_llm_client to avoid
+    # actual LLM creation, and read_reflection_for_ticker to return None
+    with (
+        patch(
+            "tradingagents.agents.auditors.momentum_auditor.bind_structured",
+            return_value=mock_llm,
+        ),
+        patch(
             "tradingagents.agents.auditors.momentum_auditor.create_llm_client",
-        ):
-            # Mock read_reflection_for_ticker to return None
-            with patch(
-                "tradingagents.agents.auditors.momentum_auditor.read_reflection_for_ticker",
-                return_value=None,
-            ):
-                llm_node = create_auditor_llm_node("claude-sonnet-5")
+        ),
+        patch(
+            "tradingagents.agents.auditors.momentum_auditor.read_reflection_for_ticker",
+            return_value=None,
+        ),
+    ):
+        llm_node = create_auditor_llm_node("claude-sonnet-5")
 
-                state = {
-                    "company_of_interest": "AAPL",
-                    "auditor_phase1_status": "pass",
-                    "auditor_retorno_12_1": 0.1,
-                    "auditor_z_score": 2.0,
-                    "thesis_verdict": "Buy",
-                }
+        state = {
+            "company_of_interest": "AAPL",
+            "auditor_phase1_status": "pass",
+            "auditor_retorno_12_1": 0.1,
+            "auditor_z_score": 2.0,
+            "thesis_verdict": "Buy",
+        }
 
-                result = llm_node(state)
+        llm_node(state)
 
-                # Verify the prompt does NOT contain a reflection section header
-                assert captured_prompt is not None
-                # The prompt should not have a reflection block (check for a common header we'd use)
-                assert "Prior Auditor Analysis" not in captured_prompt or captured_prompt.count("Prior Auditor Analysis") == 0
+        # Verify the prompt does NOT contain a reflection section header
+        assert captured_prompt is not None
+        # The prompt should not have a reflection block (check for a common header we'd use)
+        assert "Prior Auditor Analysis" not in captured_prompt or captured_prompt.count("Prior Auditor Analysis") == 0
 
 
 # ---------------------------------------------------------------------------
@@ -171,27 +173,26 @@ def test_inconclusive_short_circuit_unaffected():
     with patch(
         "tradingagents.agents.auditors.momentum_auditor.bind_structured",
         return_value=mock_llm,
-    ):
-        with patch(
-            "tradingagents.agents.auditors.momentum_auditor.read_reflection_for_ticker"
-        ) as mock_read:
-            llm_node = create_auditor_llm_node(MagicMock())
+    ), patch(
+        "tradingagents.agents.auditors.momentum_auditor.read_reflection_for_ticker"
+    ) as mock_read:
+        llm_node = create_auditor_llm_node(MagicMock())
 
-            state = {
-                "company_of_interest": "AAPL",
-                "auditor_phase1_status": "fail",  # Short-circuit
-                "auditor_phase1_failure_reason": "insufficient_ohlcv_history",
-                "auditor_retorno_12_1": 0.0,
-                "auditor_z_score": 0.0,
-                "thesis_verdict": "Buy",
-            }
+        state = {
+            "company_of_interest": "AAPL",
+            "auditor_phase1_status": "fail",  # Short-circuit
+            "auditor_phase1_failure_reason": "insufficient_ohlcv_history",
+            "auditor_retorno_12_1": 0.0,
+            "auditor_z_score": 0.0,
+            "thesis_verdict": "Buy",
+        }
 
-            result = llm_node(state)
+        result = llm_node(state)
 
-            # Verify read_reflection_for_ticker was NEVER called
-            mock_read.assert_not_called()
-            # Verify we got the fail-open response
-            assert result["auditor_verdict"] == "INCONCLUSIVE"
+        # Verify read_reflection_for_ticker was NEVER called
+        mock_read.assert_not_called()
+        # Verify we got the fail-open response
+        assert result["auditor_verdict"] == "INCONCLUSIVE"
 
 
 # ---------------------------------------------------------------------------

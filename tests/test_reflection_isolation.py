@@ -23,18 +23,17 @@ import inspect
 
 import pytest
 
-from tradingagents.agents.researchers.momentum_researcher import create_momentum_llm_node
 from tradingagents.agents.auditors.momentum_auditor import create_auditor_llm_node
-from tradingagents.agents.risk_mgmt.conservative_perspective import (
-    create_conservative_perspective,
+from tradingagents.agents.researchers.momentum_researcher import create_momentum_llm_node
+from tradingagents.agents.risk_mgmt.aggressive_perspective import (
+    create_aggressive_perspective,
 )
 from tradingagents.agents.risk_mgmt.balanced_perspective import (
     create_balanced_perspective,
 )
-from tradingagents.agents.risk_mgmt.aggressive_perspective import (
-    create_aggressive_perspective,
+from tradingagents.agents.risk_mgmt.conservative_perspective import (
+    create_conservative_perspective,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test 1: Research reads only research layer

@@ -235,7 +235,7 @@ class TestCheckpointForced(unittest.TestCase):
             )
             return mock_instance
 
-        with mock.patch.object(runner, "TradingAgentsGraph", side_effect=capture_graph_init) as mock_graph_class, \
+        with mock.patch.object(runner, "TradingAgentsGraph", side_effect=capture_graph_init), \
              mock.patch.object(runner, "summarize_costs") as mock_summarize:
             mock_summarize.return_value = {
                 "total_cost_usd": 0.0,

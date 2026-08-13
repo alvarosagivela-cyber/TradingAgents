@@ -5,16 +5,16 @@ Tests verify:
 - D-07: Deterministic overfitting flag (sharpe > 1.0), no LLM judgment
 """
 
-from unittest.mock import Mock, MagicMock
-from datetime import datetime, timedelta
-import pytest
+from datetime import datetime
+from unittest.mock import Mock
+
 import numpy as np
 
 from tradingagents.trading.sharpe_calculator import (
-    compute_window_sharpe,
-    _extract_equity,
     OVERFITTING_SHARPE_THRESHOLD,
     REFERENCE_RANGE,
+    _extract_equity,
+    compute_window_sharpe,
 )
 
 
@@ -213,7 +213,7 @@ class TestComputeWindowSharpe:
         start_date = datetime(2026, 8, 1, 0, 0, 0)
         end_date = datetime(2026, 8, 5, 23, 59, 59)
 
-        result = compute_window_sharpe(mock_client, start_date, end_date)
+        compute_window_sharpe(mock_client, start_date, end_date)
 
         # Verify get_portfolio_history was called
         mock_client.get_portfolio_history.assert_called_once()

@@ -7,12 +7,11 @@ false-positive and false-negative rates for the Auditor's Buy/Sell verdicts.
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
 
-from tradingagents.dataflows.config import get_config, set_config
+from tradingagents.dataflows.config import set_config
 from tradingagents.jobs.auditor_false_positive_analyzer import aggregate_auditor_reflections
 
 

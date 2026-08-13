@@ -18,7 +18,6 @@ Key design choices:
 
 import logging
 from datetime import datetime
-from typing import Optional, Union
 
 import numpy as np
 from alpaca.trading.client import TradingClient
@@ -36,7 +35,7 @@ REFERENCE_RANGE: tuple[float, float] = (0.5, 1.0)
 TRADING_DAYS_PER_YEAR: int = 252
 
 
-def _extract_equity(history: Union[object, dict]) -> list[float]:
+def _extract_equity(history: object | dict) -> list[float]:
     """Extract equity array from Alpaca response (handles both object and dict types).
 
     The Alpaca SDK's get_portfolio_history() returns Union[PortfolioHistory, dict].

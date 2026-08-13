@@ -191,10 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     # Resolve tickers: use override if provided, else use D-03 basket
-    if args.tickers:
-        tickers = [t.strip() for t in args.tickers.split(",")]
-    else:
-        tickers = PHASE7_TICKER_BASKET
+    tickers = [t.strip() for t in args.tickers.split(",")] if args.tickers else PHASE7_TICKER_BASKET
 
     # Resolve selected analysts
     selected_analysts = [a.strip() for a in args.analysts.split(",")]
@@ -234,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     # Print budget status (D-11)
     print()
     budget = summarize_costs()
-    print(f"Budget status at end of run:")
+    print("Budget status at end of run:")
     print(
         f"  Total cost: ${budget['total_cost_usd']:.2f} | "
         f"Projected annual: ${budget['projected_annual_usd']:.2f} / "

@@ -6,12 +6,13 @@ properly integrated into the main workflow, connecting from the last analyst
 to the Auditor chain (Phase 05.1 post-wiring).
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-from tradingagents.graph.setup import GraphSetup
-from tradingagents.graph.conditional_logic import ConditionalLogic
+import pytest
+
 from tradingagents.graph.analyst_execution import build_analyst_execution_plan
+from tradingagents.graph.conditional_logic import ConditionalLogic
+from tradingagents.graph.setup import GraphSetup
 
 
 @pytest.mark.unit

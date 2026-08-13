@@ -19,8 +19,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tradingagents.agents.schemas import RiskDecision
-from tradingagents.agents.utils.agent_states import AgentState
-
 
 # ---------------------------------------------------------------------------
 # Shared test helpers
@@ -116,14 +114,14 @@ class TestRiskSquadPipeline:
         written with final_veto: false.
         """
         # Imports that will fail until the Risk Squad modules are created (RED state)
-        from tradingagents.agents.risk_mgmt.conservative_perspective import (
-            create_conservative_perspective,
+        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
+            create_aggressive_perspective,
         )
         from tradingagents.agents.risk_mgmt.balanced_perspective import (
             create_balanced_perspective,
         )
-        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
-            create_aggressive_perspective,
+        from tradingagents.agents.risk_mgmt.conservative_perspective import (
+            create_conservative_perspective,
         )
         from tradingagents.agents.risk_mgmt.risk_aggregator import (
             create_risk_aggregator,
@@ -156,48 +154,50 @@ class TestRiskSquadPipeline:
             mock_config.return_value = {
                 "risk_log_path": str(tmp_path / "risk.jsonl")
             }
-            with patch(
-                "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
-            ) as mock_factory_cons:
-                with patch(
+            with (
+                patch(
+                    "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
+                ) as mock_factory_cons,
+                patch(
                     "tradingagents.agents.risk_mgmt.balanced_perspective.create_llm_client"
-                ) as mock_factory_bal:
-                    with patch(
-                        "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
-                    ) as mock_factory_agg:
-                        mock_factory_cons.return_value.get_llm.return_value = mock_conservative
-                        mock_factory_bal.return_value.get_llm.return_value = mock_balanced
-                        mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
+                ) as mock_factory_bal,
+                patch(
+                    "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
+                ) as mock_factory_agg,
+            ):
+                mock_factory_cons.return_value.get_llm.return_value = mock_conservative
+                mock_factory_bal.return_value.get_llm.return_value = mock_balanced
+                mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
 
-                        # Run all three perspective nodes
-                        cons_node = create_conservative_perspective()
-                        cons_update = cons_node(state)
-                        state.update(cons_update)
+                # Run all three perspective nodes
+                cons_node = create_conservative_perspective()
+                cons_update = cons_node(state)
+                state.update(cons_update)
 
-                        bal_node = create_balanced_perspective()
-                        bal_update = bal_node(state)
-                        state.update(bal_update)
+                bal_node = create_balanced_perspective()
+                bal_update = bal_node(state)
+                state.update(bal_update)
 
-                        agg_node = create_aggressive_perspective()
-                        agg_update = agg_node(state)
-                        state.update(agg_update)
+                agg_node = create_aggressive_perspective()
+                agg_update = agg_node(state)
+                state.update(agg_update)
 
-                        # Run aggregator
-                        aggregator = create_risk_aggregator()
-                        agg_result = aggregator(state)
-                        state.update(agg_result)
+                # Run aggregator
+                aggregator = create_risk_aggregator()
+                agg_result = aggregator(state)
+                state.update(agg_result)
 
-                        # Assertions
-                        assert state.get("final_veto") is False, "All approve → final_veto should be False"
-                        assert state.get("concentration_verified") is True, "All cite correct concentration → verified"
-                        assert (tmp_path / "risk.jsonl").exists(), "JSONL file should be created"
+                # Assertions
+                assert state.get("final_veto") is False, "All approve → final_veto should be False"
+                assert state.get("concentration_verified") is True, "All cite correct concentration → verified"
+                assert (tmp_path / "risk.jsonl").exists(), "JSONL file should be created"
 
-                        # Verify JSONL content
-                        import json
-                        lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
-                        assert len(lines) == 1, "Should have exactly one record"
-                        record = json.loads(lines[0])
-                        assert record["final_veto"] is False
+                # Verify JSONL content
+                import json
+                lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
+                assert len(lines) == 1, "Should have exactly one record"
+                record = json.loads(lines[0])
+                assert record["final_veto"] is False
 
     def test_2_any_veto_persists_d06_regression_guard(self, tmp_path):
         """Test 2 (any-veto — D-06 regression guard, the single most important test):
@@ -205,14 +205,14 @@ class TestRiskSquadPipeline:
         -> final_veto=True, AND the JSONL record still exists with final_veto: true
         (asserts persistence is unconditional, not gated on approval like Research's pattern).
         """
-        from tradingagents.agents.risk_mgmt.conservative_perspective import (
-            create_conservative_perspective,
+        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
+            create_aggressive_perspective,
         )
         from tradingagents.agents.risk_mgmt.balanced_perspective import (
             create_balanced_perspective,
         )
-        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
-            create_aggressive_perspective,
+        from tradingagents.agents.risk_mgmt.conservative_perspective import (
+            create_conservative_perspective,
         )
         from tradingagents.agents.risk_mgmt.risk_aggregator import (
             create_risk_aggregator,
@@ -252,47 +252,49 @@ class TestRiskSquadPipeline:
             mock_config.return_value = {
                 "risk_log_path": str(tmp_path / "risk.jsonl")
             }
-            with patch(
-                "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
-            ) as mock_factory_cons:
-                with patch(
+            with (
+                patch(
+                    "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
+                ) as mock_factory_cons,
+                patch(
                     "tradingagents.agents.risk_mgmt.balanced_perspective.create_llm_client"
-                ) as mock_factory_bal:
-                    with patch(
-                        "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
-                    ) as mock_factory_agg:
-                        mock_factory_cons.return_value.get_llm.return_value = mock_conservative
-                        mock_factory_bal.return_value.get_llm.return_value = mock_balanced
-                        mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
+                ) as mock_factory_bal,
+                patch(
+                    "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
+                ) as mock_factory_agg,
+            ):
+                mock_factory_cons.return_value.get_llm.return_value = mock_conservative
+                mock_factory_bal.return_value.get_llm.return_value = mock_balanced
+                mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
 
-                        # Run perspective nodes
-                        cons_node = create_conservative_perspective()
-                        cons_update = cons_node(state)
-                        state.update(cons_update)
+                # Run perspective nodes
+                cons_node = create_conservative_perspective()
+                cons_update = cons_node(state)
+                state.update(cons_update)
 
-                        bal_node = create_balanced_perspective()
-                        bal_update = bal_node(state)
-                        state.update(bal_update)
+                bal_node = create_balanced_perspective()
+                bal_update = bal_node(state)
+                state.update(bal_update)
 
-                        agg_node = create_aggressive_perspective()
-                        agg_update = agg_node(state)
-                        state.update(agg_update)
+                agg_node = create_aggressive_perspective()
+                agg_update = agg_node(state)
+                state.update(agg_update)
 
-                        # Run aggregator
-                        aggregator = create_risk_aggregator()
-                        agg_result = aggregator(state)
-                        state.update(agg_result)
+                # Run aggregator
+                aggregator = create_risk_aggregator()
+                agg_result = aggregator(state)
+                state.update(agg_result)
 
-                        # Assertions
-                        assert state.get("final_veto") is True, "Any veto → final_veto should be True"
-                        assert (tmp_path / "risk.jsonl").exists(), "JSONL file should exist even on veto"
+                # Assertions
+                assert state.get("final_veto") is True, "Any veto → final_veto should be True"
+                assert (tmp_path / "risk.jsonl").exists(), "JSONL file should exist even on veto"
 
-                        # Verify JSONL content (unconditional persistence)
-                        import json
-                        lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
-                        assert len(lines) == 1, "Should have exactly one record"
-                        record = json.loads(lines[0])
-                        assert record["final_veto"] is True, "Vetoed cycle must be persisted"
+                # Verify JSONL content (unconditional persistence)
+                import json
+                lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
+                assert len(lines) == 1, "Should have exactly one record"
+                record = json.loads(lines[0])
+                assert record["final_veto"] is True, "Vetoed cycle must be persisted"
 
     def test_3_snapshot_failure_forces_veto(self, tmp_path):
         """Test 3 (snapshot-failure forces veto — RISK-01 safety net):
@@ -300,14 +302,14 @@ class TestRiskSquadPipeline:
         LLMs return 'APPROVE' → final_veto=True anyway (aggregator's fail-safe
         override is never bypassed by LLM optimism), and the cycle is still persisted.
         """
-        from tradingagents.agents.risk_mgmt.conservative_perspective import (
-            create_conservative_perspective,
+        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
+            create_aggressive_perspective,
         )
         from tradingagents.agents.risk_mgmt.balanced_perspective import (
             create_balanced_perspective,
         )
-        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
-            create_aggressive_perspective,
+        from tradingagents.agents.risk_mgmt.conservative_perspective import (
+            create_conservative_perspective,
         )
         from tradingagents.agents.risk_mgmt.risk_aggregator import (
             create_risk_aggregator,
@@ -340,48 +342,50 @@ class TestRiskSquadPipeline:
             mock_config.return_value = {
                 "risk_log_path": str(tmp_path / "risk.jsonl")
             }
-            with patch(
-                "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
-            ) as mock_factory_cons:
-                with patch(
+            with (
+                patch(
+                    "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
+                ) as mock_factory_cons,
+                patch(
                     "tradingagents.agents.risk_mgmt.balanced_perspective.create_llm_client"
-                ) as mock_factory_bal:
-                    with patch(
-                        "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
-                    ) as mock_factory_agg:
-                        mock_factory_cons.return_value.get_llm.return_value = mock_conservative
-                        mock_factory_bal.return_value.get_llm.return_value = mock_balanced
-                        mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
+                ) as mock_factory_bal,
+                patch(
+                    "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
+                ) as mock_factory_agg,
+            ):
+                mock_factory_cons.return_value.get_llm.return_value = mock_conservative
+                mock_factory_bal.return_value.get_llm.return_value = mock_balanced
+                mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
 
-                        # Run perspective nodes
-                        cons_node = create_conservative_perspective()
-                        cons_update = cons_node(state)
-                        state.update(cons_update)
+                # Run perspective nodes
+                cons_node = create_conservative_perspective()
+                cons_update = cons_node(state)
+                state.update(cons_update)
 
-                        bal_node = create_balanced_perspective()
-                        bal_update = bal_node(state)
-                        state.update(bal_update)
+                bal_node = create_balanced_perspective()
+                bal_update = bal_node(state)
+                state.update(bal_update)
 
-                        agg_node = create_aggressive_perspective()
-                        agg_update = agg_node(state)
-                        state.update(agg_update)
+                agg_node = create_aggressive_perspective()
+                agg_update = agg_node(state)
+                state.update(agg_update)
 
-                        # Run aggregator
-                        aggregator = create_risk_aggregator()
-                        agg_result = aggregator(state)
-                        state.update(agg_result)
+                # Run aggregator
+                aggregator = create_risk_aggregator()
+                agg_result = aggregator(state)
+                state.update(agg_result)
 
-                        # Assertions: snapshot failure overrides all approvals
-                        assert state.get("final_veto") is True, "Snapshot failure → final_veto must be True regardless of LLM verdicts"
-                        assert state.get("portfolio_snapshot_status") == "fail"
+                # Assertions: snapshot failure overrides all approvals
+                assert state.get("final_veto") is True, "Snapshot failure → final_veto must be True regardless of LLM verdicts"
+                assert state.get("portfolio_snapshot_status") == "fail"
 
-                        # Verify persistence
-                        assert (tmp_path / "risk.jsonl").exists()
-                        import json
-                        lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
-                        record = json.loads(lines[0])
-                        assert record["final_veto"] is True
-                        assert record["portfolio_snapshot_status"] == "fail"
+                # Verify persistence
+                assert (tmp_path / "risk.jsonl").exists()
+                import json
+                lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
+                record = json.loads(lines[0])
+                assert record["final_veto"] is True
+                assert record["portfolio_snapshot_status"] == "fail"
 
     def test_4_concentration_hallucination_flagged(self, tmp_path):
         """Test 4 (concentration-hallucination flagged — D-11 discipline applied a third time):
@@ -390,14 +394,14 @@ class TestRiskSquadPipeline:
         while final_veto is still computed independently from verdicts alone
         (orthogonal fields, mirrors Auditor's verified/comparison_result orthogonality).
         """
-        from tradingagents.agents.risk_mgmt.conservative_perspective import (
-            create_conservative_perspective,
+        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
+            create_aggressive_perspective,
         )
         from tradingagents.agents.risk_mgmt.balanced_perspective import (
             create_balanced_perspective,
         )
-        from tradingagents.agents.risk_mgmt.aggressive_perspective import (
-            create_aggressive_perspective,
+        from tradingagents.agents.risk_mgmt.conservative_perspective import (
+            create_conservative_perspective,
         )
         from tradingagents.agents.risk_mgmt.risk_aggregator import (
             create_risk_aggregator,
@@ -438,46 +442,48 @@ class TestRiskSquadPipeline:
             mock_config.return_value = {
                 "risk_log_path": str(tmp_path / "risk.jsonl")
             }
-            with patch(
-                "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
-            ) as mock_factory_cons:
-                with patch(
+            with (
+                patch(
+                    "tradingagents.agents.risk_mgmt.conservative_perspective.create_llm_client"
+                ) as mock_factory_cons,
+                patch(
                     "tradingagents.agents.risk_mgmt.balanced_perspective.create_llm_client"
-                ) as mock_factory_bal:
-                    with patch(
-                        "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
-                    ) as mock_factory_agg:
-                        mock_factory_cons.return_value.get_llm.return_value = mock_conservative
-                        mock_factory_bal.return_value.get_llm.return_value = mock_balanced
-                        mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
+                ) as mock_factory_bal,
+                patch(
+                    "tradingagents.agents.risk_mgmt.aggressive_perspective.create_llm_client"
+                ) as mock_factory_agg,
+            ):
+                mock_factory_cons.return_value.get_llm.return_value = mock_conservative
+                mock_factory_bal.return_value.get_llm.return_value = mock_balanced
+                mock_factory_agg.return_value.get_llm.return_value = mock_aggressive
 
-                        # Run perspective nodes
-                        cons_node = create_conservative_perspective()
-                        cons_update = cons_node(state)
-                        state.update(cons_update)
+                # Run perspective nodes
+                cons_node = create_conservative_perspective()
+                cons_update = cons_node(state)
+                state.update(cons_update)
 
-                        bal_node = create_balanced_perspective()
-                        bal_update = bal_node(state)
-                        state.update(bal_update)
+                bal_node = create_balanced_perspective()
+                bal_update = bal_node(state)
+                state.update(bal_update)
 
-                        agg_node = create_aggressive_perspective()
-                        agg_update = agg_node(state)
-                        state.update(agg_update)
+                agg_node = create_aggressive_perspective()
+                agg_update = agg_node(state)
+                state.update(agg_update)
 
-                        # Run aggregator
-                        aggregator = create_risk_aggregator()
-                        agg_result = aggregator(state)
-                        state.update(agg_result)
+                # Run aggregator
+                aggregator = create_risk_aggregator()
+                agg_result = aggregator(state)
+                state.update(agg_result)
 
-                        # Assertions
-                        assert state.get("concentration_verified") is False, "Hallucination detected → not verified"
-                        # But final_veto is independent: all approved, so it's False
-                        assert state.get("final_veto") is False, "final_veto independent of concentration_verified"
+                # Assertions
+                assert state.get("concentration_verified") is False, "Hallucination detected → not verified"
+                # But final_veto is independent: all approved, so it's False
+                assert state.get("final_veto") is False, "final_veto independent of concentration_verified"
 
-                        # Verify persisted record captures both orthogonal fields
-                        assert (tmp_path / "risk.jsonl").exists()
-                        import json
-                        lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
-                        record = json.loads(lines[0])
-                        assert record["concentration_verified"] is False, "Hallucination recorded"
-                        assert record["final_veto"] is False, "Verdicts still determine veto independently"
+                # Verify persisted record captures both orthogonal fields
+                assert (tmp_path / "risk.jsonl").exists()
+                import json
+                lines = (tmp_path / "risk.jsonl").read_text(encoding="utf-8").strip().split("\n")
+                record = json.loads(lines[0])
+                assert record["concentration_verified"] is False, "Hallucination recorded"
+                assert record["final_veto"] is False, "Verdicts still determine veto independently"

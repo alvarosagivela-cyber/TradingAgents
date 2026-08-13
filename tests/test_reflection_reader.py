@@ -1,17 +1,15 @@
 """Unit tests for reflection reader — layer validation, graceful degradation, most-recent-wins."""
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
 from tradingagents.agents.reflectors.reflection_reader import (
-    read_reflection_for_ticker,
     _VALID_LAYERS,
+    read_reflection_for_ticker,
 )
-
+from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
 
 # ---------------------------------------------------------------------------
 # Test Layer Validation
@@ -35,9 +33,11 @@ class TestLayerValidation:
 
     def test_invalid_layer_fails_loud(self):
         """ValueError is raised, not silently degraded to None."""
-        with patch("tradingagents.agents.reflectors.reflection_reader.get_config"):
-            with pytest.raises(ValueError):
-                read_reflection_for_ticker("auditors", "AAPL")  # Typo: 'auditors' not 'auditor'
+        with (
+            patch("tradingagents.agents.reflectors.reflection_reader.get_config"),
+            pytest.raises(ValueError),
+        ):
+            read_reflection_for_ticker("auditors", "AAPL")  # Typo: 'auditors' not 'auditor'
 
 
 # ---------------------------------------------------------------------------

@@ -62,7 +62,7 @@ def read_reflection_for_ticker(layer: str, ticker: str) -> ReflectionRecord | No
     try:
         most_recent: ReflectionRecord | None = None
 
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:

@@ -17,9 +17,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
 
-from tradingagents.dataflows.config import get_config
 from tradingagents.jobs.cost_aggregator import summarize_costs
 
 
@@ -37,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     # No required arguments for basic report
-    args = parser.parse_args(argv if argv is not None else sys.argv[1:])
+    parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     # Aggregate costs
     result = summarize_costs()
@@ -77,7 +75,6 @@ def main(argv: list[str] | None = None) -> int:
     print("-" * 80)
     print(f"  Projected Annual Spend: ${result['projected_annual_usd']:>10.2f}")
     print(f"  Annual Target:          ${result['annual_budget_target_usd']:>10.2f}")
-    threshold_pct = result["budget_alert_threshold_pct"] * 100
     ratio_pct = (result['projected_annual_usd'] / result['annual_budget_target_usd']) * 100 if result['annual_budget_target_usd'] > 0 else 0
     print(f"  Current Usage:          {ratio_pct:>10.1f}%")
     print()

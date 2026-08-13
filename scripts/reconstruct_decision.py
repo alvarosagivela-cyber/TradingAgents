@@ -24,7 +24,6 @@ import argparse
 import re
 import sys
 
-from tradingagents.dataflows.config import get_config
 from tradingagents.jobs.decision_reconstructor import reconstruct_decision
 
 
@@ -82,7 +81,7 @@ def _format_research_section(research_record: dict | None) -> str:
     lines.append(f"  Verdict: {research_record.get('verdict', 'N/A')}")
     lines.append(f"  Reasoning: {research_record.get('reasoning', 'N/A')}")
     lines.append(f"  Refutation Criterion: {research_record.get('refutation_criterion', 'N/A')}")
-    lines.append(f"  Data Points:")
+    lines.append("  Data Points:")
     lines.append(f"    retorno_12_1: {research_record.get('retorno_12_1', 'N/A')}")
     lines.append(f"    z_score: {research_record.get('z_score', 'N/A')}")
     lines.append(f"    confidence_level: {research_record.get('confidence_level', 'N/A')}")

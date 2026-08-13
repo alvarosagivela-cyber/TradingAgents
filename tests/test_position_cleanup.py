@@ -6,8 +6,7 @@ Tests verify:
 - Fail-safe pattern: never raises, logs errors and returns status dict
 """
 
-from unittest.mock import Mock, MagicMock, patch
-import pytest
+from unittest.mock import Mock, patch
 
 from tradingagents.trading.position_cleanup import close_all_open_positions
 
@@ -81,6 +80,7 @@ class TestCloseAllOpenPositions:
     def test_close_all_open_positions_never_constructs_client(self):
         """EXEC-01: Function never constructs TradingClient; accepts one as parameter."""
         import inspect
+
         import tradingagents.trading.position_cleanup as module
 
         source = inspect.getsource(module)
@@ -103,7 +103,7 @@ class TestCloseAllOpenPositions:
         mock_client = Mock()
         mock_client.close_all_positions.return_value = [Mock(), Mock()]
 
-        result = close_all_open_positions(mock_client)
+        close_all_open_positions(mock_client)
 
         # Verify info log was called
         assert mock_logger.info.called
@@ -116,7 +116,7 @@ class TestCloseAllOpenPositions:
         mock_client = Mock()
         mock_client.close_all_positions.side_effect = Exception("Network error")
 
-        result = close_all_open_positions(mock_client)
+        close_all_open_positions(mock_client)
 
         # Verify exception log was called
         assert mock_logger.exception.called

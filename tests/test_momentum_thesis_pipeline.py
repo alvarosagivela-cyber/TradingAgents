@@ -6,12 +6,9 @@ All tests use mocked yfinance/load_ohlcv and LLM, so no network or API calls are
 
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 
 from tradingagents.agents.schemas import ResearchThesis, TraderAction
-from tradingagents.agents.utils.agent_states import AgentState
-
 
 # ---------------------------------------------------------------------------
 # Shared test helpers

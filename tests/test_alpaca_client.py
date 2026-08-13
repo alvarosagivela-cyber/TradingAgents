@@ -8,7 +8,9 @@ Tests enforce that:
 """
 
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from tradingagents.trading.alpaca_client import create_alpaca_client
 
 

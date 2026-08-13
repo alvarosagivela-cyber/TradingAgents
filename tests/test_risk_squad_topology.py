@@ -7,12 +7,12 @@ path to Paper Execution is through the Portfolio Manager's conditional router, w
 routes to "__end__" when final_veto=True.
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-from tradingagents.graph.setup import GraphSetup
+import pytest
+
 from tradingagents.graph.conditional_logic import ConditionalLogic
-from tradingagents.agents.utils.agent_states import AgentState
+from tradingagents.graph.setup import GraphSetup
 
 
 @pytest.mark.unit
@@ -92,8 +92,8 @@ def test_no_unconditional_edge_to_paper_execution():
 
     # Assert there is NO unconditional edge from Portfolio Manager to Paper Execution
     assert ("Portfolio Manager", "Paper Execution") not in workflow.edges, (
-        f"Found unconditional edge from 'Portfolio Manager' to 'Paper Execution'. "
-        f"This violates D-04: vetoed trades can bypass the veto by using the unconditional edge."
+        "Found unconditional edge from 'Portfolio Manager' to 'Paper Execution'. "
+        "This violates D-04: vetoed trades can bypass the veto by using the unconditional edge."
     )
 
     # The only edge from Portfolio Manager must be a conditional edge
@@ -130,8 +130,8 @@ def test_paper_execution_only_reachable_via_approved_veto():
 
     # Paper Execution must unconditionally edge to END (terminal state)
     assert ("Paper Execution", "__end__") in workflow.edges, (
-        f"Paper Execution does not edge to '__end__'. "
-        f"The graph structure is incomplete."
+        "Paper Execution does not edge to '__end__'. "
+        "The graph structure is incomplete."
     )
 
     # Paper Execution can ONLY be reached from Portfolio Manager via conditional router

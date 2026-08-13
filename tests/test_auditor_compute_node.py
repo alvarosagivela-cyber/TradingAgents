@@ -72,7 +72,7 @@ class TestAuditorComputeNode:
 
     def test_compute_node_field_isolation(self):
         """Source does NOT contain forbidden Research-only fields (AUDIT-01)."""
-        compute_node = create_auditor_compute_node()
+        create_auditor_compute_node()
         source = inspect.getsource(create_auditor_compute_node)
 
         # Forbidden fields that should NOT appear in Auditor compute node

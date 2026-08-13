@@ -9,6 +9,7 @@ confirming the actual implementation never references forbidden shared resources
 """
 
 import inspect
+
 import pytest
 
 from tradingagents.agents.auditors.momentum_auditor import (

@@ -6,7 +6,6 @@ Tests verify:
 - D-04: Zero market-scanning, news-scanning, or LLM-driven ticker-selection logic
 """
 
-import re
 from tradingagents.trading.validation_universe import PHASE7_TICKER_BASKET
 
 

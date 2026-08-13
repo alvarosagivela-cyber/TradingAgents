@@ -21,8 +21,6 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple
 
-import pandas as pd
-
 from tradingagents.dataflows.stockstats_utils import load_ohlcv
 from tradingagents.dataflows.symbol_utils import NoMarketDataError, crypto_base
 
@@ -151,10 +149,7 @@ def compute_momentum(ticker: str, as_of_date: str) -> MomentumMetrics:
         else:
             mean = rolling.mean()
             std = rolling.std()
-            if std == 0:
-                z_score = 0.0
-            else:
-                z_score = (retorno_12_1 - mean) / std
+            z_score = 0.0 if std == 0 else (retorno_12_1 - mean) / std
             z_score = float(round(z_score, 4))  # 4 decimals as per D-15; see float() note above
 
         # Derive confidence level from z-score magnitude (D-15)

@@ -10,7 +10,9 @@ Tests enforce that:
 """
 
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from tradingagents.trading.portfolio_snapshot import create_portfolio_snapshot_node
 
 

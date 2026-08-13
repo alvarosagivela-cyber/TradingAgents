@@ -125,7 +125,7 @@ class TestCliE2ESmoke(unittest.TestCase):
                     break
             self.assertTrue(
                 has_content,
-                f"All report files are empty or contain only NO_DATA_AVAILABLE sentinel",
+                "All report files are empty or contain only NO_DATA_AVAILABLE sentinel",
             )
 
             # Assert: message_tool.log exists

@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-
 # Thresholds for classifying realized returns (Claude's Discretion per 05-CONTEXT.md)
 NEGATIVE_RETURN_THRESHOLD = -0.01
 POSITIVE_RETURN_THRESHOLD = 0.01

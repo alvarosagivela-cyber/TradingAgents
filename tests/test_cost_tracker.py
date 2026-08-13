@@ -11,7 +11,6 @@ Tests verify that:
 
 import json
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -147,7 +146,7 @@ class TestPersistCostRecord:
             persist_cost_record(record2, log_path)
 
             # Read and verify both records
-            with open(log_path, "r") as f:
+            with open(log_path) as f:
                 lines = f.readlines()
             assert len(lines) == 2
             assert json.loads(lines[0])["layer"] == "research"

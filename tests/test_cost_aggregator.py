@@ -13,16 +13,15 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
-from datetime import datetime, timedelta, timezone
-from io import StringIO
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
 import pytest
 
+from scripts.cost_budget_report import main as cli_main
 from tradingagents.jobs.cost_aggregator import summarize_costs
 from tradingagents.llm_clients.cost_tracker import CostRecord
-from scripts.cost_budget_report import main as cli_main
 
 
 @pytest.mark.unit
@@ -185,17 +184,16 @@ class TestCostAggregator:
             with mock.patch(
                 "tradingagents.jobs.cost_aggregator.get_config",
                 return_value={"cost_log_path": str(cost_log_path)}
-            ):
-                with mock.patch(
-                    "tradingagents.jobs.cost_aggregator.datetime"
-                ) as mock_datetime:
-                    # Make datetime.now return our fixed time
-                    mock_datetime.now.return_value = fixed_now
-                    # But allow datetime.fromisoformat to work normally
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    # Allow timezone.utc to work
-                    mock_datetime.timezone.utc = timezone.utc
-                    result = summarize_costs()
+            ), mock.patch(
+                "tradingagents.jobs.cost_aggregator.datetime"
+            ) as mock_datetime:
+                # Make datetime.now return our fixed time
+                mock_datetime.now.return_value = fixed_now
+                # But allow datetime.fromisoformat to work normally
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                # Allow timezone.utc to work
+                mock_datetime.timezone.utc = timezone.utc
+                result = summarize_costs()
 
             # Total cost is $2.00, elapsed time is 24 hours (1 day)
             # Extrapolation: 2.00 * (365 / 1) = 730.0
@@ -237,15 +235,14 @@ class TestCostAggregator:
                     "annual_budget_target_usd": 630.0,
                     "budget_alert_threshold_pct": 0.80,
                 }
-            ):
-                with mock.patch(
-                    "tradingagents.jobs.cost_aggregator.datetime"
-                ) as mock_datetime:
-                    mock_datetime.now.return_value = fixed_now
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    mock_datetime.timezone.utc = timezone.utc
-                    with caplog.at_level(logging.WARNING):
-                        result = summarize_costs()
+            ), mock.patch(
+                "tradingagents.jobs.cost_aggregator.datetime"
+            ) as mock_datetime:
+                mock_datetime.now.return_value = fixed_now
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                mock_datetime.timezone.utc = timezone.utc
+                with caplog.at_level(logging.WARNING):
+                    result = summarize_costs()
 
             assert result["over_threshold"] is True
             assert "Budget alert" in caplog.text
@@ -290,12 +287,14 @@ class TestCostAggregator:
                 "budget_alert_threshold_pct": 0.80,
             }
 
-            with mock.patch("tradingagents.jobs.cost_aggregator.get_config", return_value=config):
-                with mock.patch("tradingagents.jobs.cost_aggregator.datetime") as mock_datetime:
-                    mock_datetime.now.return_value = fixed_now
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    mock_datetime.timezone.utc = timezone.utc
-                    result = summarize_costs()
+            with (
+                mock.patch("tradingagents.jobs.cost_aggregator.get_config", return_value=config),
+                mock.patch("tradingagents.jobs.cost_aggregator.datetime") as mock_datetime,
+            ):
+                mock_datetime.now.return_value = fixed_now
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                mock_datetime.timezone.utc = timezone.utc
+                result = summarize_costs()
 
             # The naive projection is still high (confirms the burst really would
             # have crossed threshold without the gate) ...
@@ -337,15 +336,14 @@ class TestCostAggregator:
                     "annual_budget_target_usd": 630.0,
                     "budget_alert_threshold_pct": 0.80,
                 }
-            ):
-                with mock.patch(
-                    "tradingagents.jobs.cost_aggregator.datetime"
-                ) as mock_datetime:
-                    mock_datetime.now.return_value = fixed_now
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    mock_datetime.timezone.utc = timezone.utc
-                    with caplog.at_level(logging.WARNING):
-                        result = summarize_costs()
+            ), mock.patch(
+                "tradingagents.jobs.cost_aggregator.datetime"
+            ) as mock_datetime:
+                mock_datetime.now.return_value = fixed_now
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                mock_datetime.timezone.utc = timezone.utc
+                with caplog.at_level(logging.WARNING):
+                    result = summarize_costs()
 
             assert result["over_threshold"] is False
             assert "Budget alert" not in caplog.text
@@ -409,14 +407,13 @@ class TestCostBudgetReportCLI:
             with mock.patch(
                 "tradingagents.jobs.cost_aggregator.get_config",
                 return_value=config_dict
-            ):
-                with mock.patch(
-                    "tradingagents.jobs.cost_aggregator.datetime"
-                ) as mock_datetime:
-                    mock_datetime.now.return_value = fixed_now
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    mock_datetime.timezone.utc = timezone.utc
-                    exit_code = cli_main([])
+            ), mock.patch(
+                "tradingagents.jobs.cost_aggregator.datetime"
+            ) as mock_datetime:
+                mock_datetime.now.return_value = fixed_now
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                mock_datetime.timezone.utc = timezone.utc
+                exit_code = cli_main([])
 
             captured = capsys.readouterr()
             assert "BUDGET ALERT" in captured.out
@@ -456,14 +453,13 @@ class TestCostBudgetReportCLI:
             with mock.patch(
                 "tradingagents.jobs.cost_aggregator.get_config",
                 return_value=config_dict
-            ):
-                with mock.patch(
-                    "tradingagents.jobs.cost_aggregator.datetime"
-                ) as mock_datetime:
-                    mock_datetime.now.return_value = fixed_now
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    mock_datetime.timezone.utc = timezone.utc
-                    exit_code = cli_main([])
+            ), mock.patch(
+                "tradingagents.jobs.cost_aggregator.datetime"
+            ) as mock_datetime:
+                mock_datetime.now.return_value = fixed_now
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                mock_datetime.timezone.utc = timezone.utc
+                exit_code = cli_main([])
 
             captured = capsys.readouterr()
             assert "BUDGET ALERT" not in captured.out
@@ -520,14 +516,13 @@ class TestCostBudgetReportCLI:
             with mock.patch(
                 "tradingagents.jobs.cost_aggregator.get_config",
                 return_value=config_dict
-            ):
-                with mock.patch(
-                    "tradingagents.jobs.cost_aggregator.datetime"
-                ) as mock_datetime:
-                    mock_datetime.now.return_value = fixed_now
-                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
-                    mock_datetime.timezone.utc = timezone.utc
-                    exit_code = cli_main([])
+            ), mock.patch(
+                "tradingagents.jobs.cost_aggregator.datetime"
+            ) as mock_datetime:
+                mock_datetime.now.return_value = fixed_now
+                mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                mock_datetime.timezone.utc = timezone.utc
+                exit_code = cli_main([])
 
             captured = capsys.readouterr()
             # Should show call count

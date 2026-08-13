@@ -8,12 +8,14 @@ Tests enforce that:
 5. submit_order exception → paper_execution_status='failed', paper_order_id='', no exception propagates
 """
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
+
 import pytest
 from alpaca.trading.enums import TimeInForce
+
 from tradingagents.agents.risk_mgmt.paper_execution import (
-    create_paper_execution_node,
     _to_alpaca_symbol,
+    create_paper_execution_node,
 )
 
 
@@ -56,16 +58,18 @@ class TestPaperExecution:
         mock_client = MagicMock()
         mock_client.submit_order.return_value = mock_order
 
-        with patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client):
-            with patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class:
-                with patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide") as mock_order_side:
-                    with patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce") as mock_tif:
-                        # Mock the request instance
-                        mock_request_instance = MagicMock()
-                        mock_request_class.return_value = mock_request_instance
+        with (
+            patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class,
+            patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide"),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce"),
+        ):
+            # Mock the request instance
+            mock_request_instance = MagicMock()
+            mock_request_class.return_value = mock_request_instance
 
-                        node = create_paper_execution_node()
-                        result = node(state)
+            node = create_paper_execution_node()
+            result = node(state)
 
         assert result["paper_execution_status"] == "submitted"
         assert result["paper_order_id"] == "test-order-id-123"
@@ -88,16 +92,18 @@ class TestPaperExecution:
         mock_client = MagicMock()
         mock_client.submit_order.return_value = mock_order
 
-        with patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client):
-            with patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class:
-                with patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide") as mock_order_side:
-                    with patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce") as mock_tif:
-                        # Mock the request instance
-                        mock_request_instance = MagicMock()
-                        mock_request_class.return_value = mock_request_instance
+        with (
+            patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class,
+            patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide"),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce"),
+        ):
+            # Mock the request instance
+            mock_request_instance = MagicMock()
+            mock_request_class.return_value = mock_request_instance
 
-                        node = create_paper_execution_node()
-                        result = node(state)
+            node = create_paper_execution_node()
+            result = node(state)
 
         assert result["paper_execution_status"] == "submitted"
         assert result["paper_order_id"] == "test-order-id-456"
@@ -116,15 +122,17 @@ class TestPaperExecution:
         mock_client = MagicMock()
         mock_client.submit_order.side_effect = Exception("Network error during order submission")
 
-        with patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client):
-            with patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class:
-                with patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide"):
-                    with patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce"):
-                        mock_request_instance = MagicMock()
-                        mock_request_class.return_value = mock_request_instance
+        with (
+            patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class,
+            patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide"),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce"),
+        ):
+            mock_request_instance = MagicMock()
+            mock_request_class.return_value = mock_request_instance
 
-                        node = create_paper_execution_node()
-                        result = node(state)  # Should NOT raise
+            node = create_paper_execution_node()
+            result = node(state)  # Should NOT raise
 
         assert result["paper_execution_status"] == "failed"
         assert result["paper_order_id"] == ""
@@ -146,24 +154,26 @@ class TestPaperExecution:
         mock_client = MagicMock()
         mock_client.submit_order.return_value = mock_order
 
-        with patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client):
-            with patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class:
-                with patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide") as mock_order_side:
-                    with patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce") as mock_tif:
-                        mock_request_instance = MagicMock()
-                        mock_request_class.return_value = mock_request_instance
+        with (
+            patch("tradingagents.agents.risk_mgmt.paper_execution.create_alpaca_client", return_value=mock_client),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.MarketOrderRequest") as mock_request_class,
+            patch("tradingagents.agents.risk_mgmt.paper_execution.OrderSide"),
+            patch("tradingagents.agents.risk_mgmt.paper_execution.TimeInForce"),
+        ):
+            mock_request_instance = MagicMock()
+            mock_request_class.return_value = mock_request_instance
 
-                        node = create_paper_execution_node()
-                        result = node(state)
+            node = create_paper_execution_node()
+            result = node(state)
 
-                        # Verify MarketOrderRequest was called with notional=5000.0
-                        # Get the actual call args
-                        call_args = mock_request_class.call_args
-                        if call_args:
-                            # Check kwargs for 'notional' presence and 'qty' absence
-                            kwargs = call_args.kwargs if call_args.kwargs else {}
-                            assert "notional" in kwargs or (call_args.args and len(call_args.args) > 2)
-                            # Verify the call includes notional (this test confirms the structure)
+            # Verify MarketOrderRequest was called with notional=5000.0
+            # Get the actual call args
+            call_args = mock_request_class.call_args
+            if call_args:
+                # Check kwargs for 'notional' presence and 'qty' absence
+                kwargs = call_args.kwargs if call_args.kwargs else {}
+                assert "notional" in kwargs or (call_args.args and len(call_args.args) > 2)
+                # Verify the call includes notional (this test confirms the structure)
 
         assert result["paper_execution_status"] == "submitted"
 

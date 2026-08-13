@@ -7,22 +7,18 @@ realized outcomes, and idempotently appends reflections to isolated per-layer st
 from __future__ import annotations
 
 import json
-import logging
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
 
 from tradingagents.dataflows.symbol_utils import NoMarketDataError
 from tradingagents.jobs.realized_outcome_processor import (
+    _existing_reflection_keys,
     _extract_auditor_verdict,
     _extract_research_verdict,
     _extract_risk_verdict,
-    _existing_reflection_keys,
     _read_jsonl,
     process_pending_outcomes,
 )
-from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
 
 
 @pytest.fixture
@@ -202,7 +198,6 @@ class TestResearchLayerHappyPath:
         self, temp_config, monkeypatch
     ):
         """Running process_pending_outcomes on research log writes to research store only."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         # Mock compute_realized_return to return 0.03 for any call
         def mock_compute(ticker, decision_date, window_days=10):
@@ -267,7 +262,6 @@ class TestAuditorLayerInconclusiveSkipped:
 
     def test_auditor_inconclusive_verdict_skipped(self, temp_config, monkeypatch):
         """Auditor INCONCLUSIVE records are not processed."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         mock_compute = __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock()
         monkeypatch.setattr(
@@ -309,7 +303,6 @@ class TestRiskLayerVerdictDerivation:
         self, temp_config, monkeypatch
     ):
         """Risk record with final_veto=true produces VETO decision verdict."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         def mock_compute(ticker, decision_date, window_days=10):
             return 0.02
@@ -348,7 +341,6 @@ class TestRiskLayerVerdictDerivation:
         self, temp_config, monkeypatch
     ):
         """Risk record with final_veto=false produces APPROVE decision verdict."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         def mock_compute(ticker, decision_date, window_days=10):
             return 0.02
@@ -391,7 +383,6 @@ class TestIdempotency:
         self, temp_config, monkeypatch
     ):
         """Running process_pending_outcomes twice does not duplicate reflections."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         def mock_compute(ticker, decision_date, window_days=10):
             return 0.03
@@ -439,7 +430,6 @@ class TestWindowNotElapsedSkipped:
         self, temp_config, monkeypatch
     ):
         """NoMarketDataError is caught, logged, and next decision is still processed."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         def mock_compute(ticker, decision_date, window_days=10):
             if decision_date == "2026-07-01":
@@ -498,7 +488,6 @@ class TestDryRunMode:
         self, temp_config, monkeypatch
     ):
         """dry_run=True computes results but writes nothing to reflection stores."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         def mock_compute(ticker, decision_date, window_days=10):
             return 0.03
@@ -541,7 +530,6 @@ class TestSinceDateFilter:
 
     def test_since_date_filters_records(self, temp_config, monkeypatch):
         """only records at-or-after since_date are processed."""
-        from tradingagents.jobs.realized_outcome_processor import process_pending_outcomes
 
         def mock_compute(ticker, decision_date, window_days=10):
             return 0.03

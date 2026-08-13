@@ -73,7 +73,7 @@ def count_auditor_refutations(start_date: str, end_date: str) -> dict[str, Any]:
     refutations: list[dict[str, Any]] = []
 
     try:
-        with open(log_path, "r", encoding="utf-8") as f:
+        with open(log_path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, start=1):
                 line = line.rstrip("\n")
                 if not line:
@@ -110,7 +110,7 @@ def count_auditor_refutations(start_date: str, end_date: str) -> dict[str, Any]:
                         }
                     )
 
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error reading {log_path}: {e}")
         return {
             "total_cycles": 0,

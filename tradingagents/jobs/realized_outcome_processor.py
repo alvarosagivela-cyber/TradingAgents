@@ -116,7 +116,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
     records = []
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, start=1):
                 line = line.rstrip("\n")
                 if not line:
@@ -129,7 +129,7 @@ def _read_jsonl(path: Path) -> list[dict]:
                         f"Failed to parse line {line_num} in {path.name}: {e}"
                     )
                     continue
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error reading {path}: {e}")
         return []
 

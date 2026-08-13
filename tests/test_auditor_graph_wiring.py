@@ -8,11 +8,12 @@ and includes a data-dependency mutation test proving the Auditor's verdict
 actually changes the Trader's output (not just edge presence, but causal data dependency).
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-from tradingagents.graph.setup import GraphSetup
+import pytest
+
 from tradingagents.graph.conditional_logic import ConditionalLogic
+from tradingagents.graph.setup import GraphSetup
 
 
 @pytest.mark.unit
@@ -83,20 +84,20 @@ def test_auditor_is_the_sole_gate_into_trader():
 
     # Assert Research Manager node is completely absent (stronger guarantee)
     assert "Research Manager" not in workflow.nodes, (
-        f"Found 'Research Manager' in workflow.nodes. "
-        f"Phase 05.1 should have disconnected this node entirely."
+        "Found 'Research Manager' in workflow.nodes. "
+        "Phase 05.1 should have disconnected this node entirely."
     )
 
     # Assert Momentum Validate flows directly to Auditor Compute
     assert ("Momentum Validate", "Auditor Compute") in workflow.edges, (
-        f"Momentum Validate does not edge to 'Auditor Compute'. "
-        f"The Auditor pipeline is not in the critical path."
+        "Momentum Validate does not edge to 'Auditor Compute'. "
+        "The Auditor pipeline is not in the critical path."
     )
 
     # Assert Auditor Compare feeds directly to Trader
     assert ("Auditor Compare", "Trader") in workflow.edges, (
-        f"Auditor Compare does not edge to 'Trader'. "
-        f"The Auditor pipeline is incomplete."
+        "Auditor Compare does not edge to 'Trader'. "
+        "The Auditor pipeline is incomplete."
     )
 
 
@@ -151,6 +152,6 @@ def test_auditor_verdict_causally_gates_trader_proposed_side():
 
     # Assert the two plans are materially different (not just whitespace)
     assert plan_match != plan_mismatch, (
-        f"Expected different plans for match vs mismatch, but got identical output. "
-        f"The Auditor's verdict is not causally gating the Trader's output."
+        "Expected different plans for match vs mismatch, but got identical output. "
+        "The Auditor's verdict is not causally gating the Trader's output."
     )

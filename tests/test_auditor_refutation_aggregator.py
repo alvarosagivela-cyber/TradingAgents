@@ -11,13 +11,11 @@ Verifies that count_auditor_refutations() correctly:
 from __future__ import annotations
 
 import json
-import tempfile
-from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from tradingagents.dataflows.config import get_config, set_config
+from tradingagents.dataflows.config import set_config
 from tradingagents.jobs.auditor_refutation_aggregator import count_auditor_refutations
 
 

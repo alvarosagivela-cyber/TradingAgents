@@ -8,11 +8,12 @@ and that the old risk_debate_state round-robin routing has been fully removed
 (regression guard for the retired D-02 vulnerability).
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-from tradingagents.graph.setup import GraphSetup
+import pytest
+
 from tradingagents.graph.conditional_logic import ConditionalLogic
+from tradingagents.graph.setup import GraphSetup
 
 
 @pytest.mark.unit
@@ -41,7 +42,7 @@ def test_risk_squad_nodes_in_graph():
 
     # Portfolio Manager must exist (unchanged from before)
     assert "Portfolio Manager" in set(workflow.nodes), (
-        f"Portfolio Manager node missing"
+        "Portfolio Manager node missing"
     )
 
 
@@ -136,18 +137,18 @@ def test_trader_can_only_reach_portfolio_manager_through_risk_squad():
 
     # There must NOT be a direct Trader -> Portfolio Manager edge
     assert ("Trader", "Portfolio Manager") not in workflow.edges, (
-        f"Found direct edge from 'Trader' to 'Portfolio Manager', "
-        f"bypassing the Risk Squad. Risk Squad is no longer in the critical path."
+        "Found direct edge from 'Trader' to 'Portfolio Manager', "
+        "bypassing the Risk Squad. Risk Squad is no longer in the critical path."
     )
 
     # Trader must edge to Portfolio Snapshot (start of Risk Squad)
     assert ("Trader", "Portfolio Snapshot") in workflow.edges, (
-        f"Trader does not edge to 'Portfolio Snapshot'. "
-        f"The Risk Squad is not in the critical path."
+        "Trader does not edge to 'Portfolio Snapshot'. "
+        "The Risk Squad is not in the critical path."
     )
 
     # Risk Aggregator must edge to Portfolio Manager
     assert ("Risk Aggregator", "Portfolio Manager") in workflow.edges, (
-        f"Risk Aggregator does not edge to 'Portfolio Manager'. "
-        f"The Risk Squad is incomplete."
+        "Risk Aggregator does not edge to 'Portfolio Manager'. "
+        "The Risk Squad is incomplete."
     )

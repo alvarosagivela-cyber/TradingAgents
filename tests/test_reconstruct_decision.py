@@ -5,7 +5,6 @@ Tests the join of the three existing per-layer JSONL decision logs
 """
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch

@@ -5,9 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tradingagents.agents.researchers.momentum_researcher import create_momentum_llm_node
 from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
-
+from tradingagents.agents.researchers.momentum_researcher import create_momentum_llm_node
 
 # ---------------------------------------------------------------------------
 # Test Reflection Injection When Present
@@ -45,37 +44,39 @@ def test_reflection_injected_when_present():
 
     mock_llm.invoke = capture_prompt
 
-    # Mock bind_structured to return our mock LLM
-    with patch(
-        "tradingagents.agents.researchers.momentum_researcher.bind_structured",
-        return_value=mock_llm,
-    ):
-        # Mock read_reflection_for_ticker to return the fixture
-        with patch(
+    # Mock bind_structured to return our mock LLM and read_reflection_for_ticker
+    # to return the fixture
+    with (
+        patch(
+            "tradingagents.agents.researchers.momentum_researcher.bind_structured",
+            return_value=mock_llm,
+        ),
+        patch(
             "tradingagents.agents.researchers.momentum_researcher.read_reflection_for_ticker",
             return_value=reflection,
-        ) as mock_read:
-            # Create the LLM node and invoke it
-            llm_node = create_momentum_llm_node(MagicMock())
+        ) as mock_read,
+    ):
+        # Create the LLM node and invoke it
+        llm_node = create_momentum_llm_node(MagicMock())
 
-            state = {
-                "company_of_interest": "AAPL",
-                "momentum_valid": True,
-                "retorno_12_1": 0.1,
-                "momentum_z_score": 2.0,
-                "market_report": "Market is bullish",
-            }
+        state = {
+            "company_of_interest": "AAPL",
+            "momentum_valid": True,
+            "retorno_12_1": 0.1,
+            "momentum_z_score": 2.0,
+            "market_report": "Market is bullish",
+        }
 
-            result = llm_node(state)
+        llm_node(state)
 
-            # Verify read_reflection_for_ticker was called with "research" layer
-            mock_read.assert_called_once_with("research", "AAPL")
+        # Verify read_reflection_for_ticker was called with "research" layer
+        mock_read.assert_called_once_with("research", "AAPL")
 
-            # Verify the prompt contains the reflection content
-            assert captured_prompt is not None
-            assert "2026-07-15" in captured_prompt
-            assert "Sell" in captured_prompt
-            assert "Prior analysis showed weakness" in captured_prompt
+        # Verify the prompt contains the reflection content
+        assert captured_prompt is not None
+        assert "2026-07-15" in captured_prompt
+        assert "Sell" in captured_prompt
+        assert "Prior analysis showed weakness" in captured_prompt
 
 
 # ---------------------------------------------------------------------------
@@ -102,31 +103,34 @@ def test_no_reflection_injection_when_none():
 
     mock_llm.invoke = capture_prompt
 
-    with patch(
-        "tradingagents.agents.researchers.momentum_researcher.bind_structured",
-        return_value=mock_llm,
-    ):
-        # Mock read_reflection_for_ticker to return None
-        with patch(
+    # Mock bind_structured to return our mock LLM and read_reflection_for_ticker
+    # to return None
+    with (
+        patch(
+            "tradingagents.agents.researchers.momentum_researcher.bind_structured",
+            return_value=mock_llm,
+        ),
+        patch(
             "tradingagents.agents.researchers.momentum_researcher.read_reflection_for_ticker",
             return_value=None,
-        ):
-            llm_node = create_momentum_llm_node(MagicMock())
+        ),
+    ):
+        llm_node = create_momentum_llm_node(MagicMock())
 
-            state = {
-                "company_of_interest": "AAPL",
-                "momentum_valid": True,
-                "retorno_12_1": 0.1,
-                "momentum_z_score": 2.0,
-                "market_report": "Market is bullish",
-            }
+        state = {
+            "company_of_interest": "AAPL",
+            "momentum_valid": True,
+            "retorno_12_1": 0.1,
+            "momentum_z_score": 2.0,
+            "market_report": "Market is bullish",
+        }
 
-            result = llm_node(state)
+        llm_node(state)
 
-            # Verify the prompt does NOT contain a reflection section header
-            assert captured_prompt is not None
-            # The prompt should not have a reflection block (check for a common header we'd use)
-            assert "Prior Analysis" not in captured_prompt or captured_prompt.count("Prior Analysis") == 0
+        # Verify the prompt does NOT contain a reflection section header
+        assert captured_prompt is not None
+        # The prompt should not have a reflection block (check for a common header we'd use)
+        assert "Prior Analysis" not in captured_prompt or captured_prompt.count("Prior Analysis") == 0
 
 
 # ---------------------------------------------------------------------------
@@ -183,26 +187,25 @@ def test_fail_open_unaffected():
     with patch(
         "tradingagents.agents.researchers.momentum_researcher.bind_structured",
         return_value=mock_llm,
-    ):
-        with patch(
-            "tradingagents.agents.researchers.momentum_researcher.read_reflection_for_ticker"
-        ) as mock_read:
-            llm_node = create_momentum_llm_node(MagicMock())
+    ), patch(
+        "tradingagents.agents.researchers.momentum_researcher.read_reflection_for_ticker"
+    ) as mock_read:
+        llm_node = create_momentum_llm_node(MagicMock())
 
-            state = {
-                "company_of_interest": "AAPL",
-                "momentum_valid": False,  # Short-circuit
-                "retorno_12_1": 0.0,
-                "momentum_z_score": 0.0,
-                "market_report": "",
-            }
+        state = {
+            "company_of_interest": "AAPL",
+            "momentum_valid": False,  # Short-circuit
+            "retorno_12_1": 0.0,
+            "momentum_z_score": 0.0,
+            "market_report": "",
+        }
 
-            result = llm_node(state)
+        result = llm_node(state)
 
-            # Verify read_reflection_for_ticker was NEVER called
-            mock_read.assert_not_called()
-            # Verify we got the fail-open response
-            assert result["verified"] is False
+        # Verify read_reflection_for_ticker was NEVER called
+        mock_read.assert_not_called()
+        # Verify we got the fail-open response
+        assert result["verified"] is False
 
 
 # ---------------------------------------------------------------------------

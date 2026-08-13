@@ -1,6 +1,6 @@
 """Unit tests for momentum_calculator — determinism, formula verification, fail-open paths."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -10,7 +10,6 @@ from tradingagents.agents.utils.momentum_calculator import (
     derive_confidence_level,
 )
 from tradingagents.dataflows.symbol_utils import NoMarketDataError
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers

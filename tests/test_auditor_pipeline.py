@@ -10,12 +10,9 @@ This pipeline deliberately does NOT read Research's computed fields or cached re
 
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 
 from tradingagents.agents.schemas import AuditorVerdict, TraderAction
-from tradingagents.agents.utils.agent_states import AgentState
-
 
 # ---------------------------------------------------------------------------
 # Shared test helpers
@@ -104,7 +101,6 @@ class TestAuditorPipeline:
         """
         # Imports that will fail until the Auditor modules are created
         from tradingagents.agents.auditors.momentum_auditor import (
-            create_auditor_compute_node,
             create_auditor_llm_node,
         )
         from tradingagents.agents.auditors.thesis_comparator import (

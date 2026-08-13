@@ -5,17 +5,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tradingagents.agents.risk_mgmt.conservative_perspective import (
-    create_conservative_perspective,
+from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
+from tradingagents.agents.risk_mgmt.aggressive_perspective import (
+    create_aggressive_perspective,
 )
 from tradingagents.agents.risk_mgmt.balanced_perspective import (
     create_balanced_perspective,
 )
-from tradingagents.agents.risk_mgmt.aggressive_perspective import (
-    create_aggressive_perspective,
+from tradingagents.agents.risk_mgmt.conservative_perspective import (
+    create_conservative_perspective,
 )
-from tradingagents.agents.reflectors.reflection_schema import ReflectionRecord
-
 
 # ---------------------------------------------------------------------------
 # Parameterized Test: Reflection Injection When Present (All 3 Perspectives)
@@ -74,37 +73,38 @@ def test_reflection_injected_when_present(perspective_factory, perspective_name,
     # Patch the module-specific path for this perspective
     module_path = f"tradingagents.agents.risk_mgmt.{perspective_name}_perspective"
 
-    # Mock bind_structured to return our mock LLM
-    with patch(f"{module_path}.bind_structured", return_value=mock_llm):
-        # Mock create_llm_client to avoid actual LLM creation
-        with patch(f"{module_path}.create_llm_client"):
-            # Mock read_reflection_for_ticker to return the fixture
-            with patch(
-                f"{module_path}.read_reflection_for_ticker",
-                return_value=reflection,
-            ) as mock_read:
-                # Create the perspective node and invoke it
-                node = perspective_factory("claude-haiku-4-5")
+    # Mock bind_structured to return our mock LLM, create_llm_client to avoid
+    # actual LLM creation, and read_reflection_for_ticker to return the fixture
+    with (
+        patch(f"{module_path}.bind_structured", return_value=mock_llm),
+        patch(f"{module_path}.create_llm_client"),
+        patch(
+            f"{module_path}.read_reflection_for_ticker",
+            return_value=reflection,
+        ) as mock_read,
+    ):
+        # Create the perspective node and invoke it
+        node = perspective_factory("claude-haiku-4-5")
 
-                state = {
-                    "company_of_interest": "AAPL",
-                    "proposed_side": "Buy",
-                    "portfolio_total_value": 100000.0,
-                    "existing_position_value": 5000.0,
-                    "proposed_notional_usd": 10000.0,
-                    "risk_concentration_pct": 0.10,
-                }
+        state = {
+            "company_of_interest": "AAPL",
+            "proposed_side": "Buy",
+            "portfolio_total_value": 100000.0,
+            "existing_position_value": 5000.0,
+            "proposed_notional_usd": 10000.0,
+            "risk_concentration_pct": 0.10,
+        }
 
-                result = node(state)
+        node(state)
 
-                # Verify read_reflection_for_ticker was called with "risk" layer
-                mock_read.assert_called_once_with("risk", "AAPL")
+        # Verify read_reflection_for_ticker was called with "risk" layer
+        mock_read.assert_called_once_with("risk", "AAPL")
 
-                # Verify the prompt contains the reflection content
-                assert captured_prompt is not None
-                assert "2026-07-15" in captured_prompt
-                assert "VETO" in captured_prompt
-                assert "concentration breach" in captured_prompt
+        # Verify the prompt contains the reflection content
+        assert captured_prompt is not None
+        assert "2026-07-15" in captured_prompt
+        assert "VETO" in captured_prompt
+        assert "concentration breach" in captured_prompt
 
 
 # ---------------------------------------------------------------------------
@@ -152,31 +152,33 @@ def test_no_reflection_injection_when_none(perspective_factory, perspective_name
     # Patch the module-specific path for this perspective
     module_path = f"tradingagents.agents.risk_mgmt.{perspective_name}_perspective"
 
-    with patch(f"{module_path}.bind_structured", return_value=mock_llm):
-        # Mock create_llm_client to avoid actual LLM creation
-        with patch(f"{module_path}.create_llm_client"):
-            # Mock read_reflection_for_ticker to return None
-            with patch(
-                f"{module_path}.read_reflection_for_ticker",
-                return_value=None,
-            ):
-                node = perspective_factory("claude-haiku-4-5")
+    # Mock bind_structured to return our mock LLM, create_llm_client to avoid
+    # actual LLM creation, and read_reflection_for_ticker to return None
+    with (
+        patch(f"{module_path}.bind_structured", return_value=mock_llm),
+        patch(f"{module_path}.create_llm_client"),
+        patch(
+            f"{module_path}.read_reflection_for_ticker",
+            return_value=None,
+        ),
+    ):
+        node = perspective_factory("claude-haiku-4-5")
 
-                state = {
-                    "company_of_interest": "AAPL",
-                    "proposed_side": "Buy",
-                    "portfolio_total_value": 100000.0,
-                    "existing_position_value": 5000.0,
-                    "proposed_notional_usd": 10000.0,
-                    "risk_concentration_pct": 0.10,
-                }
+        state = {
+            "company_of_interest": "AAPL",
+            "proposed_side": "Buy",
+            "portfolio_total_value": 100000.0,
+            "existing_position_value": 5000.0,
+            "proposed_notional_usd": 10000.0,
+            "risk_concentration_pct": 0.10,
+        }
 
-                result = node(state)
+        node(state)
 
-                # Verify the prompt does NOT contain a reflection section header
-                assert captured_prompt is not None
-                # The prompt should not have a reflection block
-                assert "Prior Risk Assessment" not in captured_prompt or captured_prompt.count("Prior Risk Assessment") == 0
+        # Verify the prompt does NOT contain a reflection section header
+        assert captured_prompt is not None
+        # The prompt should not have a reflection block
+        assert "Prior Risk Assessment" not in captured_prompt or captured_prompt.count("Prior Risk Assessment") == 0
 
 
 # ---------------------------------------------------------------------------

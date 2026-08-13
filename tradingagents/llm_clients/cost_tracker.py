@@ -19,8 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .cost_pricing import calculate_cost
 from tradingagents.dataflows.config import get_config
+
+from .cost_pricing import calculate_cost
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ def read_cost_records(log_path: Path) -> list[CostRecord]:
 
     records = []
     try:
-        with open(log_path, "r", encoding="utf-8") as f:
+        with open(log_path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, start=1):
                 line = line.rstrip("\n")
                 if not line:
@@ -146,7 +147,7 @@ def read_cost_records(log_path: Path) -> list[CostRecord]:
                         f"Failed to parse line {line_num} in {log_path.name}: {e}"
                     )
                     continue
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error reading {log_path}: {e}")
         return []
 

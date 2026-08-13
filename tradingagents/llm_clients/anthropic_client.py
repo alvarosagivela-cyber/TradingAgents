@@ -1,3 +1,4 @@
+import contextlib
 import re
 from typing import Any
 
@@ -68,7 +69,9 @@ class NormalizedChatAnthropic(ChatAnthropic):
         # Capture cost from usage_metadata (defense in depth: even if
         # record_cost_from_response fails, we still return the response).
         # D-05: cost tracking never blocks the pipeline.
-        try:
+        # record_cost_from_response already logs all exceptions internally,
+        # so we just swallow here for defense in depth.
+        with contextlib.suppress(Exception):
             record_cost_from_response(
                 response,
                 layer=self.cost_layer,
@@ -76,10 +79,6 @@ class NormalizedChatAnthropic(ChatAnthropic):
                 ticker=self.cost_ticker,
                 trade_date=self.cost_trade_date,
             )
-        except Exception:
-            # record_cost_from_response already logs all exceptions internally,
-            # so we just swallow here for defense in depth.
-            pass
 
         return normalize_content(response)
 

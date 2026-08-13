@@ -7,8 +7,9 @@ Tests verify that:
 4. Existing test_anthropic_effort.py still passes (backward compatibility)
 """
 
-import pytest
 from unittest import mock
+
+import pytest
 
 from tradingagents.llm_clients import anthropic_client as mod
 
@@ -148,7 +149,7 @@ class TestInvokeCostCapture:
                     cost_trade_date="2026-08-05",
                     api_key="x",
                 )
-                result = llm.invoke("test input")
+                llm.invoke("test input")
 
                 # Verify record_cost_from_response was called
                 assert mock_record_cost.called

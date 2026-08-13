@@ -202,7 +202,7 @@ class TestAuditorPersistence:
 
             # Verify JSONL record was written
             assert Path(log_path).exists(), f"JSONL log should exist at {log_path}"
-            with open(log_path, "r") as f:
+            with open(log_path) as f:
                 records = [json.loads(line) for line in f]
 
             assert len(records) == 1, "Should have exactly one record"
@@ -237,7 +237,7 @@ class TestAuditorPersistence:
 
             # Verify JSONL record was written
             assert Path(log_path).exists(), f"JSONL log should exist at {log_path}"
-            with open(log_path, "r") as f:
+            with open(log_path) as f:
                 records = [json.loads(line) for line in f]
 
             assert len(records) == 1, "Should have exactly one record"
@@ -272,7 +272,7 @@ class TestAuditorPersistence:
 
             # Verify JSONL record was written
             assert Path(log_path).exists(), f"JSONL log should exist at {log_path}"
-            with open(log_path, "r") as f:
+            with open(log_path) as f:
                 records = [json.loads(line) for line in f]
 
             assert len(records) == 1, "Should have exactly one record"
@@ -305,7 +305,7 @@ class TestAuditorPersistence:
 
             compare_node(state)
 
-            with open(log_path, "r") as f:
+            with open(log_path) as f:
                 record = json.loads(f.readline())
 
             # Verify required fields are present

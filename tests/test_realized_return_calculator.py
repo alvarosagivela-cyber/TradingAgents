@@ -1,16 +1,15 @@
 """Unit tests for realized return calculator — 10-trading-day window, deterministic calculation."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
 from tradingagents.dataflows.realized_return_calculator import (
-    compute_realized_return,
     REALIZED_RETURN_WINDOW_DAYS,
+    compute_realized_return,
 )
 from tradingagents.dataflows.symbol_utils import NoMarketDataError
-
 
 # ---------------------------------------------------------------------------
 # Test Happy Path

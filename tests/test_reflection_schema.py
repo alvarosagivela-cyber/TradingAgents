@@ -1,18 +1,13 @@
 """Unit tests for reflection schema — ReflectionRecord, serialization, classification."""
 
-from datetime import datetime
-from unittest.mock import patch
 
 import pytest
 
 from tradingagents.agents.reflectors.reflection_schema import (
     ReflectionRecord,
-    classify_realized_return,
     build_lesson_text,
-    NEGATIVE_RETURN_THRESHOLD,
-    POSITIVE_RETURN_THRESHOLD,
+    classify_realized_return,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test Classification Thresholds

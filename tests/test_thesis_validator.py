@@ -1,15 +1,14 @@
 """Unit tests for thesis_validator — tolerance boundaries, persistence, quality checks."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from tradingagents.agents.utils.thesis_validator import (
+    _check_refutation_quality,
     create_momentum_validate_node,
     validate_thesis,
-    _check_refutation_quality,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
