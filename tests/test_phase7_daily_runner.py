@@ -9,6 +9,7 @@ Tests verify:
 
 from __future__ import annotations
 
+import os
 import unittest
 from unittest import mock
 
@@ -146,7 +147,8 @@ class TestMainDefaults(unittest.TestCase):
         - main() returns 0
         """
         with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
-             mock.patch.object(runner, "summarize_costs") as mock_summarize:
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(runner, "get_already_processed_tickers", return_value=set()):
             # Setup: all tickers succeed
             mock_instance = mock.MagicMock()
             mock_instance.propagate.return_value = (
@@ -186,7 +188,8 @@ class TestMainDefaults(unittest.TestCase):
         """
         with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
              mock.patch.object(runner.time, "sleep"), \
-             mock.patch.object(runner, "summarize_costs") as mock_summarize:
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(runner, "get_already_processed_tickers", return_value=set()):
             # Setup: all propagate calls raise
             mock_instance = mock.MagicMock()
             mock_instance.propagate.side_effect = RuntimeError("always fails")
@@ -236,7 +239,8 @@ class TestCheckpointForced(unittest.TestCase):
             return mock_instance
 
         with mock.patch.object(runner, "TradingAgentsGraph", side_effect=capture_graph_init) as mock_graph_class, \
-             mock.patch.object(runner, "summarize_costs") as mock_summarize:
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(runner, "get_already_processed_tickers", return_value=set()):
             mock_summarize.return_value = {
                 "total_cost_usd": 0.0,
                 "call_count": 0,
@@ -255,3 +259,114 @@ class TestCheckpointForced(unittest.TestCase):
             assert len(captured_configs) > 0
             for cfg in captured_configs:
                 assert cfg.get("checkpoint_enabled") is True
+
+
+@pytest.mark.unit
+class TestIdempotencyGuard(unittest.TestCase):
+    """Test the idempotency guard that prevents double-processing a ticker.
+
+    Found in production: a manual workflow_dispatch test run and that day's
+    normal scheduled cron trigger landed on the same calendar day, and both
+    processed all 13 tickers -- doubling real LLM spend and, worse, doubling
+    every persisted decision record (which would inflate VALID-01's Auditor-
+    refutation count on any day with a real mismatch verdict).
+    """
+
+    def test_get_already_processed_tickers_missing_file_returns_empty(self):
+        """No auditor log yet (first-ever run) -> nothing is skipped."""
+        result = runner.get_already_processed_tickers(
+            "2026-08-24", "/nonexistent/path/audits.jsonl"
+        )
+        assert result == set()
+
+    def test_get_already_processed_tickers_matches_only_given_date(self):
+        import json
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(json.dumps({"ticker": "AAPL", "trade_date": "2026-08-24"}) + "\n")
+            f.write(json.dumps({"ticker": "XOM", "trade_date": "2026-08-24"}) + "\n")
+            f.write(json.dumps({"ticker": "JPM", "trade_date": "2026-08-23"}) + "\n")
+            path = f.name
+
+        try:
+            result = runner.get_already_processed_tickers("2026-08-24", path)
+            assert result == {"AAPL", "XOM"}
+        finally:
+            os.remove(path)
+
+    def test_get_already_processed_tickers_fails_open_on_malformed_json(self):
+        """A corrupt/unreadable log must never block a real run (D-08 philosophy)."""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        ) as f:
+            f.write("{not valid json\n")
+            path = f.name
+
+        try:
+            result = runner.get_already_processed_tickers("2026-08-24", path)
+            assert result == set()
+        finally:
+            os.remove(path)
+
+    def test_main_skips_already_processed_ticker_without_calling_propagate(self):
+        """A ticker already persisted for trade_date must not be reprocessed."""
+        with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(
+                 runner, "get_already_processed_tickers", return_value={"AAPL"}
+             ):
+            mock_instance = mock.MagicMock()
+            mock_instance.propagate.return_value = (
+                {"final_trade_decision": "HOLD"}, "HOLD",
+            )
+            mock_graph_class.return_value = mock_instance
+            mock_summarize.return_value = {
+                "total_cost_usd": 0.0, "call_count": 0, "by_layer": {},
+                "by_model": {}, "projected_annual_usd": 0.0,
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80, "over_threshold": False,
+            }
+
+            exit_code = runner.main(
+                ["--trade-date", "2026-08-24", "--tickers", "AAPL,XOM"]
+            )
+
+            assert exit_code == 0
+            # Only XOM should have been processed -- AAPL was already done
+            assert mock_instance.propagate.call_count == 1
+            mock_instance.propagate.assert_called_once_with(
+                "XOM", "2026-08-24", asset_type="stock"
+            )
+
+    def test_main_force_bypasses_idempotency_guard(self):
+        """--force reprocesses every ticker even if already persisted."""
+        with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(
+                 runner, "get_already_processed_tickers"
+             ) as mock_already_processed:
+            mock_instance = mock.MagicMock()
+            mock_instance.propagate.return_value = (
+                {"final_trade_decision": "HOLD"}, "HOLD",
+            )
+            mock_graph_class.return_value = mock_instance
+            mock_summarize.return_value = {
+                "total_cost_usd": 0.0, "call_count": 0, "by_layer": {},
+                "by_model": {}, "projected_annual_usd": 0.0,
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80, "over_threshold": False,
+            }
+
+            exit_code = runner.main(
+                ["--trade-date", "2026-08-24", "--tickers", "AAPL,XOM", "--force"]
+            )
+
+            assert exit_code == 0
+            # --force must skip the idempotency check entirely
+            mock_already_processed.assert_not_called()
+            assert mock_instance.propagate.call_count == 2

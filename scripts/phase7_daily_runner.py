@@ -25,11 +25,24 @@ status remain reviewable after the fact regardless of how the process was invoke
 Explicit scope boundary: This script is invoked once per day by Task Scheduler.
 It does NOT itself register the scheduled task — see setup_phase7_scheduler.ps1
 for the one-time, human-run, documented setup artifact.
+
+Idempotency guard: before processing a ticker, checks whether an Auditor cycle
+is already persisted for (ticker, trade_date) and skips it if so. This exists
+because a scheduled trigger and a manual workflow_dispatch test run can land on
+the same calendar day (confirmed in production: a manual re-run to verify an
+API-limit fix, followed a couple hours later by that day's normal cron trigger,
+double-processed all 13 tickers -- doubling real LLM spend and, worse, doubling
+every persisted decision record, which would silently inflate VALID-01's
+Auditor-refutation count on any day with a real mismatch verdict). The guard
+also means a day that partially failed (some tickers skipped) can be safely
+re-run later to backfill only the missing tickers, without redoing the ones
+that already succeeded. Pass --force to bypass and reprocess unconditionally.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import re
@@ -84,6 +97,52 @@ def _validate_trade_date(value: str) -> str:
             "Date must be in YYYY-MM-DD format (e.g., '2026-08-01')"
         )
     return value
+
+
+def get_already_processed_tickers(trade_date: str, auditor_log_path: str) -> set[str]:
+    """Return tickers that already have a persisted Auditor cycle for trade_date.
+
+    The Auditor is the last step in the Research->Auditor chain to persist
+    (unconditionally, regardless of comparison_result -- AUDIT-04), so its
+    presence for a given (ticker, trade_date) is a reliable "this cycle already
+    completed" signal. Fails open (returns an empty set, i.e. process everything)
+    on any read error, so a corrupt or unreadable log never blocks a real run --
+    consistent with this module's D-08 fail-open philosophy.
+
+    Args:
+        trade_date: The trade date in YYYY-MM-DD format
+        auditor_log_path: Path to the auditor JSONL log
+
+    Returns:
+        Set of ticker symbols already processed for trade_date
+    """
+    processed: set[str] = set()
+    if not os.path.exists(auditor_log_path):
+        return processed
+
+    try:
+        with open(auditor_log_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if record.get("trade_date") == trade_date:
+                    ticker = record.get("ticker")
+                    if ticker:
+                        processed.add(ticker)
+    except Exception:
+        logger.exception(
+            "Failed reading auditor log for idempotency check at %s; "
+            "proceeding without the skip-already-done guard",
+            auditor_log_path,
+        )
+        return set()
+
+    return processed
 
 
 def run_ticker_with_retry(
@@ -187,6 +246,16 @@ def main(argv: list[str] | None = None) -> int:
         default="market",
         help="Comma-separated analyst types (default: 'market' to avoid unused spend on Sentiment/News/Fundamentals)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Bypass the idempotency guard and reprocess every ticker even if "
+            "already persisted for this trade_date. Use only for a deliberate "
+            "re-run; the default (off) is what prevents a manual test run and "
+            "a same-day scheduled trigger from double-processing everything."
+        ),
+    )
 
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
@@ -210,9 +279,28 @@ def main(argv: list[str] | None = None) -> int:
         ", ".join(selected_analysts),
     )
 
+    # Idempotency guard: skip tickers already persisted for this trade_date,
+    # unless --force. Prevents a manual test run + the day's normal scheduled
+    # trigger from double-processing (and double-spending/double-recording).
+    already_processed: set[str] = set()
+    if not args.force:
+        already_processed = get_already_processed_tickers(
+            args.trade_date, config["auditor_log_path"]
+        )
+        for ticker in already_processed:
+            if ticker in tickers:
+                logger.info(
+                    "ALREADY PROCESSED ticker=%s trade_date=%s "
+                    "(idempotency guard -- pass --force to reprocess)",
+                    ticker,
+                    args.trade_date,
+                )
+
     # Run each ticker with retry-then-skip
     results: dict[str, bool] = {}
     for ticker in tickers:
+        if ticker in already_processed:
+            continue
         results[ticker] = run_ticker_with_retry(
             ticker,
             args.trade_date,
@@ -223,13 +311,17 @@ def main(argv: list[str] | None = None) -> int:
     # Print summary
     succeeded = [t for t, ok in results.items() if ok]
     skipped = [t for t, ok in results.items() if not ok]
+    reused = [t for t in tickers if t in already_processed]
     print()
     print(
         f"Day summary: {len(succeeded)}/{len(tickers)} tickers succeeded, "
+        f"{len(reused)} already processed (skipped duplicate), "
         f"{len(skipped)} skipped"
     )
     if skipped:
         print(f"  Skipped: {', '.join(skipped)}")
+    if reused:
+        print(f"  Already processed: {', '.join(reused)}")
 
     # Print budget status (D-11)
     print()
