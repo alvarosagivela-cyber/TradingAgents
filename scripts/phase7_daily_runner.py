@@ -121,19 +121,25 @@ def get_already_processed_tickers(trade_date: str, auditor_log_path: str) -> set
         return processed
 
     try:
-        with open(auditor_log_path, "r", encoding="utf-8") as f:
+        with open(auditor_log_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     record = json.loads(line)
-                except json.JSONDecodeError:
+                    # A line can be valid JSON but not an object (e.g. a bare
+                    # number or array) -- .get() on that raises AttributeError,
+                    # not JSONDecodeError. Same bug class Phase 6 hardened
+                    # read_cost_records()/decision_reconstructor against; skip
+                    # only this one malformed line, don't lose the guard for
+                    # every other valid record in the file over it.
+                    if record.get("trade_date") == trade_date:
+                        ticker = record.get("ticker")
+                        if ticker:
+                            processed.add(ticker)
+                except (json.JSONDecodeError, AttributeError, TypeError):
                     continue
-                if record.get("trade_date") == trade_date:
-                    ticker = record.get("ticker")
-                    if ticker:
-                        processed.add(ticker)
     except Exception:
         logger.exception(
             "Failed reading auditor log for idempotency check at %s; "

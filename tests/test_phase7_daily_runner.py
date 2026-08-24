@@ -313,6 +313,33 @@ class TestIdempotencyGuard(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_get_already_processed_tickers_skips_only_one_bad_line_not_whole_file(self):
+        """A single valid-JSON-but-non-dict line (e.g. a bare number) must not
+        disable the guard for every other valid record in the file.
+
+        record.get(...) on a non-dict raises AttributeError, not
+        JSONDecodeError -- same bug class Phase 6 hardened
+        read_cost_records()/decision_reconstructor against elsewhere in this
+        codebase. The fix must skip only the bad line, not fail the whole read
+        (which would silently re-enable double-processing for every ticker).
+        """
+        import json
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(json.dumps({"ticker": "AAPL", "trade_date": "2026-08-24"}) + "\n")
+            f.write("42\n")  # valid JSON, not a dict
+            f.write(json.dumps({"ticker": "XOM", "trade_date": "2026-08-24"}) + "\n")
+            path = f.name
+
+        try:
+            result = runner.get_already_processed_tickers("2026-08-24", path)
+            assert result == {"AAPL", "XOM"}
+        finally:
+            os.remove(path)
+
     def test_main_skips_already_processed_ticker_without_calling_propagate(self):
         """A ticker already persisted for trade_date must not be reprocessed."""
         with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
