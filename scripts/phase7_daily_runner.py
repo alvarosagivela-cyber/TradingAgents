@@ -8,8 +8,18 @@ propagate() method per ticker in the D-03 fixed basket.
 D-08: Implements retry-once-then-skip: if a single ticker's propagate() call
 raises an exception, we retry exactly once after a short delay. If the retry
 also fails, we log the skip and continue to the next ticker. The day's run
-always continues to completion and always exits 0 — a bad day never halts the
-4-6 week window.
+always continues to completion regardless of individual ticker failures — a
+bad ticker never halts the rest of the day.
+
+Exit code: 0 unless a *majority* of the tickers actually attempted this run
+failed, in which case exit 1. This is deliberately narrower than "any skip" --
+D-08's per-ticker tolerance above is preserved, one flaky ticker still exits 0
+-- but a systemic failure (everything or almost everything failing) must be
+loud. Confirmed necessary in production: an Anthropic org spend-cap outage,
+then separately an invalid-API-key outage, each ran for a full week completely
+undetected because this always returned 0 and GitHub Actions only alerts on a
+non-zero exit -- every day still showed green in Actions despite processing
+zero real decisions, both times only caught by a manual "how's it going" check.
 
 D-11: Every invocation prints the current budget status (from Phase 6's
 cost_aggregator.summarize_costs()) to stdout, visible via Windows Task Scheduler's
@@ -17,10 +27,11 @@ run history — passive, always-fresh visibility with zero new command the user
 must remember to run.
 
 Persistent logging: Task Scheduler does not capture a launched process's stdout/
-stderr, and this script always exits 0 (D-08), so console output and exit code are
-not durable records for an unattended 4-6 week window. Every run also appends to
-a log file under DEFAULT_CONFIG["results_dir"] so per-ticker outcomes and budget
-status remain reviewable after the fact regardless of how the process was invoked.
+stderr, and a run with only isolated ticker skips still exits 0, so console
+output alone is not a durable record for an unattended 4-6 week window. Every
+run also appends to a log file under DEFAULT_CONFIG["results_dir"] so per-ticker
+outcomes and budget status remain reviewable after the fact regardless of how
+the process was invoked or what its exit code was.
 
 Explicit scope boundary: This script is invoked once per day by Task Scheduler.
 It does NOT itself register the scheduled task — see setup_phase7_scheduler.ps1
@@ -341,7 +352,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     print()
 
-    # D-08: Always return 0 — per-ticker skips are expected, recoverable behavior
+    # D-08 preserved for individual ticker hiccups (transient data/API blips):
+    # a single skipped ticker never fails the run. But a *majority* of the
+    # tickers actually attempted this run failing is a systemic problem, not
+    # a normal day -- confirmed twice in production (an Anthropic spend-cap
+    # outage, then an invalid-API-key outage), both invisible for a full week
+    # each because this always returned 0 and GitHub Actions only alerts on a
+    # non-zero exit, so every day still showed green despite processing
+    # nothing. `attempted` excludes idempotency-guard skips (already-done
+    # tickers aren't failures) so re-running an already-complete day never
+    # trips this.
+    attempted = len(tickers) - len(reused)
+    if attempted > 0 and len(skipped) > attempted / 2:
+        print(
+            f"WARNING: majority of attempted tickers failed "
+            f"({len(skipped)}/{attempted}) -- treating this as a systemic "
+            f"failure (exit 1) so the run shows red and any configured "
+            f"GitHub Actions failure alert actually fires."
+        )
+        return 1
+
     return 0
 
 

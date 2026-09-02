@@ -179,12 +179,21 @@ class TestMainDefaults(unittest.TestCase):
                 runner.PHASE7_TICKER_BASKET
             )
 
-    def test_main_returns_zero_even_when_all_tickers_skip(self):
-        """Test that main() returns 0 even if all tickers fail (D-08).
+    def test_main_returns_nonzero_when_all_tickers_skip(self):
+        """Test that main() returns a nonzero exit code when every attempted
+        ticker fails -- a systemic problem, not an isolated hiccup.
+
+        Confirmed necessary in production: an Anthropic spend-cap outage, then
+        separately an invalid-API-key outage, each ran silently for a full
+        week because this used to always return 0 regardless of how many
+        tickers failed, so GitHub Actions never marked the run red and no
+        failure alert could ever fire.
 
         Proves:
-        - Exit code is 0 even when all tickers are skipped
-        - The run continues to completion and budget status is printed
+        - Exit code is nonzero when all tickers are skipped
+        - The run still continues to completion and budget status is printed
+          (D-08's per-ticker tolerance is unchanged -- this only affects the
+          final exit code, not whether the loop keeps going)
         """
         with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
              mock.patch.object(runner.time, "sleep"), \
@@ -211,8 +220,63 @@ class TestMainDefaults(unittest.TestCase):
                 ["--trade-date", "2026-08-11", "--tickers", "AAPL,XOM"]
             )
 
-            # Assert: exit code is still 0 (D-08)
+            # Assert: exit code is nonzero -- a systemic failure must be loud
+            assert exit_code != 0
+
+    def test_main_returns_zero_when_only_a_minority_of_tickers_skip(self):
+        """D-08's per-ticker tolerance is preserved: one flaky ticker among
+        many must not fail the whole run."""
+        with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
+             mock.patch.object(runner.time, "sleep"), \
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(runner, "get_already_processed_tickers", return_value=set()):
+            mock_instance = mock.MagicMock()
+            # AAPL fails both attempts; the other 3 tickers succeed
+            mock_instance.propagate.side_effect = [
+                RuntimeError("transient"),
+                RuntimeError("transient"),
+                ({"final_trade_decision": "HOLD"}, "HOLD"),
+                ({"final_trade_decision": "HOLD"}, "HOLD"),
+                ({"final_trade_decision": "HOLD"}, "HOLD"),
+            ]
+            mock_graph_class.return_value = mock_instance
+
+            mock_summarize.return_value = {
+                "total_cost_usd": 0.0, "call_count": 0, "by_layer": {},
+                "by_model": {}, "projected_annual_usd": 0.0,
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80, "over_threshold": False,
+            }
+
+            exit_code = runner.main(
+                ["--trade-date", "2026-08-11", "--tickers", "AAPL,XOM,JPM,ETSY"]
+            )
+
             assert exit_code == 0
+
+    def test_main_returns_zero_when_everything_already_processed(self):
+        """Re-running an already-complete day (0 attempted, all idempotency-
+        skipped) must not be misread as a systemic failure -- attempted=0
+        should never divide/compare into a false failure."""
+        with mock.patch.object(runner, "TradingAgentsGraph") as mock_graph_class, \
+             mock.patch.object(runner, "summarize_costs") as mock_summarize, \
+             mock.patch.object(
+                 runner, "get_already_processed_tickers",
+                 return_value={"AAPL", "XOM"},
+             ):
+            mock_summarize.return_value = {
+                "total_cost_usd": 0.0, "call_count": 0, "by_layer": {},
+                "by_model": {}, "projected_annual_usd": 0.0,
+                "annual_budget_target_usd": 630.0,
+                "budget_alert_threshold_pct": 0.80, "over_threshold": False,
+            }
+
+            exit_code = runner.main(
+                ["--trade-date", "2026-08-11", "--tickers", "AAPL,XOM"]
+            )
+
+            assert exit_code == 0
+            mock_graph_class.assert_not_called()
 
 
 @pytest.mark.unit
